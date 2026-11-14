@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         1080xin 附件區塊右側懸浮垂直版 (透明版)
-// @namespace    http://tampermonkey.net/
-// @version      4.4.2
+// @name         [x1080] 版面｜附件區塊右側懸浮
+// @namespace    https://github.com/kulaLin/x1080
+// @version      4.5
 // @description  將 attachments-section 改為右側垂直排列、透明背景、下載按鈕徹底移至最底部、檔名完整橫排顯示，100%保留原生按鈕
 // @match        *://*.1080xin.com/*
 // @match        *://1080xin.com/*

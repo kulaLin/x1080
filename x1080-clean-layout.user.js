@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         1080xin 版面精簡（隱藏頂部數據、簽名檔廣告與底部回覆區）
-// @namespace    http://tampermonkey.net/
-// @version      1.2
+// @name         [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區）
+// @namespace    https://github.com/kulaLin/x1080
+// @version      1.3
 // @description  隱藏標題下方數據按鈕、主文下方VIP簽名檔與操作列，以及底部所有回覆與編輯器區塊
 // @author       James
 // @match        *://*.1080xin.com/*

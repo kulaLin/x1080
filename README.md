@@ -3,15 +3,31 @@
 
 ## 腳本列表
 
-| 腳本 | 說明 | 安裝 |
-|---|---|---|
-| [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
-| [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
-| [x1080-clean-layout](#x1080-clean-layout) | 版面精簡：隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
-| [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
-| [x1080-visited-marker](#x1080-visited-marker) | 自行記錄開過的連結並淡化＋打勾，不依賴瀏覽器 :visited（Linkclump 大量開啟也有效） | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
+| Tampermonkey 名稱 | 檔案 | 說明 | 安裝 |
+|---|---|---|---|
+| [x1080] 下載｜磁力連結面板＋Notion | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
+| [x1080] 下載｜附件連結一鍵提取 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
+| [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
+| [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區） | [x1080-clean-layout](#x1080-clean-layout) | 隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
+| [x1080] 瀏覽｜已開連結標記 | [x1080-visited-marker](#x1080-visited-marker) | 自行記錄開過的連結並淡化＋打勾，不依賴瀏覽器 :visited（Linkclump 大量開啟也有效） | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
+
+### 命名與版本規範
+
+新增或修改腳本時一律照這個規範。
+
+| 項目 | 規則 | 範例 |
+|---|---|---|
+| Tampermonkey 名稱（`@name`） | `[x1080] 類別｜功能`，功能約 12 字內，細節寫在 `@description` | `[x1080] 下載｜附件連結一鍵提取` |
+| 類別 | 只用三種：**下載**（取得連結、下載、送出）、**版面**（改外觀、隱藏、移位）、**瀏覽**（標記、導覽、閱讀輔助） | |
+| 檔名 | `x1080-對象-功能.user.js`，全小寫英文、用 `-` 連接 | `x1080-attachment-extract.user.js` |
+| `@namespace` | 固定 `https://github.com/kulaLin/x1080` | |
+| 版本號 | 主版.次版.修正：修 bug → 第三碼 +1；加功能或改名稱等外觀資訊 → 第二碼 +1；大改 → 第一碼 +1；只改註解不升版 | 4.4 → 4.4.1 / 4.5 / 5.0 |
+| 已知問題 | 程式碼內用 `// [已知問題] YYYY-MM-DD` 註解，README 對應段落同步記錄 | |
+| 設定值 | 放在腳本開頭的常數或 `CONFIG`，要改請改 repo 檔案（在 Tampermonkey 編輯器改會被自動更新覆蓋） | |
+
+> Tampermonkey 用「`@name` + `@namespace`」辨認同一支腳本。這兩個值一改，就會被當成新腳本，原本存在腳本裡的資料（Notion token、已開記錄等）不會帶過去，改之前要先備份。
 
 ### 腳本之間的已知衝突（待確認）
 
@@ -21,7 +37,7 @@
 
 ## x1080-magnet-notion
 
-檔案：`x1080-magnet-notion.user.js`
+檔案：`x1080-magnet-notion.user.js`（Tampermonkey 名稱：[x1080] 下載｜磁力連結面板＋Notion）
 
 > 已知衝突：與 x1080-attachment-panel 的右側面板位置重疊，見上方「腳本之間的已知衝突」。
 
@@ -53,7 +69,7 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 
 ## x1080-attachment-extract
 
-檔案：`x1080-attachment-extract.user.js`（Tampermonkey 內名稱：附件下載連結一鍵提取器 (1080xin 專用版)）
+檔案：`x1080-attachment-extract.user.js`（Tampermonkey 名稱：[x1080] 下載｜附件連結一鍵提取）
 
 頁面上有「按次數下載」按鈕時，右下角出現「⚡ 一鍵提取下載連結 (N)」按鈕。
 
@@ -84,7 +100,7 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 
 ## x1080-clean-layout
 
-檔案：`x1080-clean-layout.user.js`（Tampermonkey 內名稱：1080xin 版面精簡（隱藏頂部數據、簽名檔廣告與底部回覆區））
+檔案：`x1080-clean-layout.user.js`（Tampermonkey 名稱：[x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區））
 
 適用網域：1080xin.com、x1080x.com（含子網域）。以 CSS 在頁面載入前就隱藏，不會閃一下才消失。
 
@@ -104,7 +120,7 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 
 ## x1080-attachment-panel
 
-檔案：`x1080-attachment-panel.user.js`（Tampermonkey 內名稱：1080xin 附件區塊右側懸浮垂直版 (透明版)）
+檔案：`x1080-attachment-panel.user.js`（Tampermonkey 名稱：[x1080] 版面｜附件區塊右側懸浮）
 
 > 已知衝突：與 x1080-magnet-notion 的右側面板位置重疊，見上方「腳本之間的已知衝突」。
 
@@ -132,7 +148,7 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 
 ## x1080-visited-marker
 
-檔案：`x1080-visited-marker.user.js`（Tampermonkey 內名稱：已開連結標記 (1080xin.com)）
+檔案：`x1080-visited-marker.user.js`（Tampermonkey 名稱：[x1080] 瀏覽｜已開連結標記）
 
 不問瀏覽器「這個連結造訪過沒有」，而是每個頁面載入時把自己的網址記進腳本的儲存空間，清單頁再比對這份記錄，命中的連結就淡化並加上 ✓。因此不受 Chromium `:visited` 分區化影響，用 Linkclump、中鍵、Ctrl+點擊大量開啟的分頁也會被標記。
 
@@ -157,7 +173,7 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 
 > 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
 
-> 記錄存在 Tampermonkey 這支腳本的儲存空間。從 GitHub 安裝時若被當成「新腳本」而不是「更新」，會是一份全新的空記錄，所以安裝前建議先用選單「匯出記錄」備份。
+> 記錄存在 Tampermonkey 這支腳本的儲存空間。從 GitHub 安裝時若被當成「新腳本」而不是「更新」（例如 `@name` 或 `@namespace` 改過），會是一份全新的空記錄，所以安裝前先用選單「匯出記錄」備份，裝好後再「匯入記錄」。
 
 ### 已知問題（待改版）
 

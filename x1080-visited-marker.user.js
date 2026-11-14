@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         已開連結標記 (1080xin.com)
-// @namespace    local.visited-marker
-// @version      1.1.1
+// @name         [x1080] 瀏覽｜已開連結標記
+// @namespace    https://github.com/kulaLin/x1080
+// @version      1.2
 // @description  自行記錄開過的連結並標記，完全不依賴瀏覽器 :visited，可解決 Chromium 分區化後 Linkclump 等擴充功能大量開啟的連結不變色的問題
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -37,9 +37,10 @@
 
  安裝
  ─────────────────────────────────────────────────────────────
- Edge 的 Tampermonkey → 儀表板 → 直接編輯原本那支腳本並貼上覆蓋，
- 不要另外新增一支。編輯原腳本會沿用同一份儲存空間，
- 新增一支則是全新的空記錄。
+ 從 GitHub 安裝：https://github.com/kulaLin/x1080
+ Tampermonkey 以「@name + @namespace」辨認同一支腳本，記錄存在該腳本自己的儲存空間。
+ 這兩個值一改就會被當成新腳本、記錄是空的，所以改之前先用選單「匯出記錄」備份，
+ 裝好新版後再「匯入記錄」。v1.2 起名稱與 namespace 依 repo 命名規範統一。
 
  快捷鍵
  ─────────────────────────────────────────────────────────────

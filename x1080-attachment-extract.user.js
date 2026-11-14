@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         附件下載連結一鍵提取器 (1080xin 專用版)
-// @namespace    http://tampermonkey.net/
-// @version      2.8
+// @name         [x1080] 下載｜附件連結一鍵提取
+// @namespace    https://github.com/kulaLin/x1080
+// @version      2.9
 // @description  自動點擊「按次數下載」並攔截真實下載網址與 Token，完成後自動關閉分頁
 // @author       Gemini
 // @match        *://1080xin.com/*
