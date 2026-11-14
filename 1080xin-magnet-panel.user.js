@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         1080xin 磁力連結右側懸浮面板
 // @namespace    http://tampermonkey.net/
-// @version      4.1
+// @version      4.2
 // @description  自動提取 1080xin.com「BT綜合區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -11,6 +11,7 @@
 // @grant        GM_setValue
 // @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
+// @grant        window.close
 // @connect      api.notion.com
 // @homepageURL  https://github.com/kulaLin/x1080
 // @updateURL    https://raw.githubusercontent.com/kulaLin/x1080/main/1080xin-magnet-panel.user.js
@@ -140,7 +141,8 @@
         GM_deleteValue('notionToken');
         GM_deleteValue('notionPageUrl');
         GM_deleteValue('notionPageId');
-        GM_deleteValue('notionSubPageId');
+        GM_deleteValue('notionSubPage');
+        GM_deleteValue('notionSentCache');
         setStatus('已清除 Notion 設定');
     }
 
@@ -257,11 +259,11 @@
 
     // 找主頁面底下的「純 magnet 連結」子頁面，沒有就自動建立
     async function findOrCreateSubPage(cfg, mainChildren) {
-        const cached = GM_getValue('notionSubPageId', '');
+        const cached = getCachedSubId(cfg.pageId);
         const subs = mainChildren.filter(b => b.type === 'child_page');
         const found = subs.find(b => b.id === cached) || subs.find(b => b.child_page.title === SUB_PAGE_TITLE);
         if (found) {
-            GM_setValue('notionSubPageId', found.id);
+            GM_setValue('notionSubPage', { pageId: cfg.pageId, subId: found.id });
             return found.id;
         }
         const page = await notionRequest(cfg.token, 'POST', '/v1/pages', {
@@ -269,7 +271,7 @@
             icon: { type: 'emoji', emoji: '🔗' },
             properties: { title: { title: [{ type: 'text', text: { content: SUB_PAGE_TITLE } }] } }
         });
-        GM_setValue('notionSubPageId', page.id);
+        GM_setValue('notionSubPage', { pageId: cfg.pageId, subId: page.id });
         return page.id;
     }
 
@@ -319,20 +321,68 @@
         return [header, ...codes];
     }
 
-    // 傳送：主頁面與子頁面各自比對，已存在的 magnet（同 hash）一律略過
+    /* 已送出 magnet 的本機快取（依主頁面區分）
+       傳送時直接比對快取，不必每次讀取整個 Notion 頁面，速度才能控制在 1 秒內；
+       「整理 Notion」會以 Notion 實際內容重建快取 */
+    function getSentCache(pageId) {
+        const c = GM_getValue('notionSentCache', null);
+        return c && c.pageId === pageId ? new Set(c.hashes) : null;
+    }
+    function saveSentCache(pageId, set) {
+        GM_setValue('notionSentCache', { pageId, hashes: [...set] });
+    }
+
+    // 子頁面 ID 也記在本機（依主頁面區分）
+    function getCachedSubId(pageId) {
+        const c = GM_getValue('notionSubPage', null);
+        return c && c.pageId === pageId ? c.subId : '';
+    }
+
+    async function appendToSub(cfg, subId, magnets) {
+        const blocks = magnets.map(plainMagnetBlock);
+        try {
+            await appendBlocks(cfg.token, subId, blocks);
+        } catch (e) {
+            if (e.status !== 404) throw e;
+            // 子頁面被刪除或搬走：重新尋找或建立後再寫一次
+            GM_deleteValue('notionSubPage');
+            const mainChildren = await listChildren(cfg.token, cfg.pageId);
+            const newSubId = await findOrCreateSubPage(cfg, mainChildren);
+            await appendBlocks(cfg.token, newSubId, blocks);
+        }
+    }
+
+    // 傳送：已送過的 magnet（同 hash）一律略過；主頁面與子頁面同時寫入
     async function doSend(cfg, magnets) {
-        const mainChildren = await listChildren(cfg.token, cfg.pageId);
-        const mainHashes = new Set(mainChildren.map(b => hashOf(blockText(b))).filter(Boolean));
-        const newMain = magnets.filter(m => !mainHashes.has(hashOf(m)));
-        if (newMain.length) await appendBlocks(cfg.token, cfg.pageId, buildBlocks(newMain));
+        let sent = getSentCache(cfg.pageId);
+        let subId = getCachedSubId(cfg.pageId);
 
-        const subId = await findOrCreateSubPage(cfg, mainChildren);
-        const subChildren = await listChildren(cfg.token, subId);
-        const subHashes = new Set(subChildren.map(b => hashOf(blockText(b))).filter(Boolean));
-        const newSub = magnets.filter(m => !subHashes.has(hashOf(m)));
-        if (newSub.length) await appendBlocks(cfg.token, subId, newSub.map(plainMagnetBlock));
+        // 第一次使用（或換了頁面）才讀取一次 Notion 建立快取
+        if (!sent || !subId) {
+            const mainChildren = await listChildren(cfg.token, cfg.pageId);
+            if (!sent) {
+                sent = new Set(mainChildren.map(b => hashOf(blockText(b))).filter(Boolean));
+                saveSentCache(cfg.pageId, sent);
+            }
+            if (!subId) subId = await findOrCreateSubPage(cfg, mainChildren);
+        }
 
-        return { added: newMain.length, skipped: magnets.length - newMain.length };
+        const fresh = magnets.filter(m => !sent.has(hashOf(m)));
+        if (!fresh.length) return { added: 0, skipped: magnets.length };
+
+        const [mainRes, subRes] = await Promise.allSettled([
+            appendBlocks(cfg.token, cfg.pageId, buildBlocks(fresh)),
+            appendToSub(cfg, subId, fresh)
+        ]);
+        if (mainRes.status === 'rejected') throw mainRes.reason;
+
+        fresh.forEach(m => sent.add(hashOf(m)));
+        saveSentCache(cfg.pageId, sent);
+
+        if (subRes.status === 'rejected') {
+            throw new Error('主頁面已寫入，子頁面失敗：' + subRes.reason.message + '（可按「整理 Notion」補齊）');
+        }
+        return { added: fresh.length, skipped: magnets.length - fresh.length };
     }
 
     function sendToNotion(magnets, btn) {
@@ -345,13 +395,12 @@
         return enqueue(async () => {
             try {
                 const { added, skipped } = await doSend(cfg, magnets);
-                if (added === 0) {
-                    btn.textContent = '已存在';
-                    setStatus('Notion 已有這些連結，未重複寫入');
-                } else {
-                    btn.textContent = '已傳送 ✓';
-                    setStatus(`已新增 ${added} 條到 Notion` + (skipped ? `，略過重複 ${skipped} 條` : ''));
-                }
+                btn.textContent = added ? '已傳送 ✓' : '已存在';
+                setStatus(added
+                    ? `已新增 ${added} 條到 Notion` + (skipped ? `，略過重複 ${skipped} 條` : '') + '，關閉分頁…'
+                    : 'Notion 已有這些連結，關閉分頁…');
+                // 確認 Notion 寫入成功後立即關閉分頁（失敗時保留分頁）
+                window.close();
             } catch (e) {
                 btn.textContent = '失敗';
                 setStatus('傳送失敗：' + e.message, true);
@@ -406,6 +455,9 @@
 
         const missing = [...seen.entries()].filter(([h]) => !subSeen.has(h)).map(([, m]) => m);
         if (missing.length) await appendBlocks(cfg.token, subId, missing.map(plainMagnetBlock));
+
+        // 以 Notion 實際內容重建本機快取（在 Notion 手動刪除的連結之後可再次傳送）
+        saveSentCache(cfg.pageId, new Set(seen.keys()));
 
         return { removed: toDelete.length, synced: missing.length };
     }
