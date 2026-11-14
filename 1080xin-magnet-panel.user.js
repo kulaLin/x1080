@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         1080xin 磁力連結右側懸浮面板
 // @namespace    http://tampermonkey.net/
-// @version      4.2
+// @version      4.3
 // @description  自動提取 1080xin.com「BT綜合區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -14,8 +14,8 @@
 // @grant        window.close
 // @connect      api.notion.com
 // @homepageURL  https://github.com/kulaLin/x1080
-// @updateURL    https://raw.githubusercontent.com/kulaLin/x1080/main/1080xin-magnet-panel.user.js
-// @downloadURL  https://raw.githubusercontent.com/kulaLin/x1080/main/1080xin-magnet-panel.user.js
+// @updateURL    https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js
+// @downloadURL  https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js
 // ==/UserScript==
 
 (function () {
