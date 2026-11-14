@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜磁力連結面板＋Notion
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.5
+// @version      4.5.1
 // @description  自動提取 1080xin.com「BT綜合區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -34,8 +34,8 @@
 
     // ★ 送 Notion 成功後是否自動關閉分頁（true = 關閉 / false = 不關閉）
     const AUTO_CLOSE_TAB = true;
-    // ★ 送 Notion 成功後等幾毫秒再關閉分頁（2000 = 2 秒）；倒數期間可按「取消關閉」或 Esc 取消
-    const CLOSE_DELAY_MS = 2000;
+    // ★ 送 Notion 成功後等幾毫秒再關閉分頁（5000 = 5 秒）；倒數期間可按「取消關閉」或 Esc 取消
+    const CLOSE_DELAY_MS = 5000;
 
     let lastKey = null;
     let collapsed = false;
