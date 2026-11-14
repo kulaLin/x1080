@@ -180,6 +180,21 @@
         return CONFIG.SITE_HOSTS.some(re => re.test(hostname)) ? CONFIG.SITE_KEY : hostname;
     }
 
+    // [已知問題] 2026-11-15 記錄，待改版修正
+    // 網站改版後（Next.js），文章網址是 /resources/<id>，而且同一篇文章會帶不同的查詢參數：
+    //   - 板塊列表上的連結：/resources/<id>?return=%2Fboards%2F7RHPO2w4jFUYiDhDsxz0wE
+    //     （2026-11-15 實測 BT綜合區列表 23 個文章連結全部是這個格式）
+    //   - 進入文章後網址列：/resources/<id>?page=1&order=asc
+    // 下面的 MERGE_THREAD_PAGES 只認得舊 Discuz 的 tid / thread-123-，對 /resources/<id> 不起作用，
+    // 參數又只去掉 DROP_PARAMS 裡列的，所以 return / page / order 都會進到 key 裡。可能造成：
+    //   1) 從不同列表頁（不同板塊、分頁、搜尋結果，return 值不同）進同一篇文章，被當成不同筆，
+    //      在 A 列表開過的文章，到 B 列表不會顯示已開
+    //   2) 頁面載入時記錄的若是 ?page=1&order=asc 那種網址，就對不上列表上 ?return=… 的連結
+    //      （目前列表上仍有已標記的連結，推測載入當下網址還是 ?return=…，網站之後才改寫網址；未完全確認）
+    // 修正方向：
+    //   - 在下方 MERGE_THREAD_PAGES 區塊加一條：路徑符合 /resources/<id> 時，只回傳 host + '|res:' + id
+    //   - 比照 migrateHosts() 寫一次性轉換，把現有 site|/resources/<id>?… 的記錄合併成 site|res:<id>
+    //   - 較小的替代方案：把 'return'、'page'、'order' 加進 DROP_PARAMS（但舊記錄仍需轉換）
     function keyOf(raw) {
         let u;
         try { u = new URL(raw, location.href); } catch (e) { return null; }
