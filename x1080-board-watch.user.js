@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 瀏覽｜板塊新文章通知
 // @namespace    https://github.com/kulaLin/x1080
-// @version      1.0
+// @version      1.0.1
 // @description  定時檢查關注的 1080xin 板塊，有新文章就用 Telegram 與桌面通知提醒；需保留一個 1080xin 分頁開著（建議釘選）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -14,7 +14,9 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_notification
 // @grant        GM_openInTab
+// @grant        unsafeWindow
 // @connect      api.telegram.org
+// @connect      1080xin.com
 // @homepageURL  https://github.com/kulaLin/x1080
 // @updateURL    https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js
 // @downloadURL  https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js
@@ -62,15 +64,81 @@
     const now = () => Date.now();
 
     // ===== 讀取板塊 ========================================================
-    // 用目前已登入的瀏覽器狀態讀取板塊頁（同網域請求，會帶上本站 cookie）
-    async function fetchBoard(board) {
-        const res = await fetch(board.url, { credentials: 'include' });
-        const html = await res.text();
-        if (res.status !== 200 || /cf-chl|Just a moment/i.test(html)) {
-            const err = new Error(`讀取失敗（HTTP ${res.status}），可能需要在瀏覽器重新登入或通過網站驗證`);
-            err.needsAttention = true;
-            throw err;
+    // v1.0 直接在腳本環境呼叫 fetch，實測全部被網站擋下（HTTP 403）：腳本環境發出的請求
+    // 不會被當成網頁本身的請求，登入狀態與網站驗證的 cookie 沒有帶上。
+    // 改為依序嘗試：① 借用網頁本身的 fetch（與瀏覽網頁時的請求相同）② Tampermonkey 的 GM_xmlhttpRequest
+    // ③ 在隱藏的 iframe 載入板塊頁再讀取（等同正常開啟網頁，最穩但最耗資源，只在前兩種都失敗時使用）
+    let lastMethod = '';
+
+    function pageFetchText(url) {
+        const w = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+        return w.fetch(url, { credentials: 'include' })
+            .then(async r => ({ status: r.status, text: await r.text() }));
+    }
+
+    function gmFetchText(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: location.origin + url,
+                anonymous: false,
+                timeout: 20000,
+                onload: r => resolve({ status: r.status, text: r.responseText }),
+                onerror: () => reject(new Error('GM 請求失敗')),
+                ontimeout: () => reject(new Error('GM 請求逾時'))
+            });
+        });
+    }
+
+    function iframeFetchText(url) {
+        return new Promise((resolve, reject) => {
+            const f = document.createElement('iframe');
+            f.setAttribute('aria-hidden', 'true');
+            f.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;border:0;';
+            let timer = null;
+            const finish = fn => {
+                clearTimeout(timer);
+                setTimeout(() => f.remove(), 0);
+                fn();
+            };
+            timer = setTimeout(() => finish(() => reject(new Error('逾時'))), 30000);
+            f.onload = () => {
+                try {
+                    const doc = f.contentDocument;
+                    const html = doc && doc.documentElement ? doc.documentElement.outerHTML : '';
+                    finish(() => resolve({ status: html ? 200 : 0, text: html }));
+                } catch (e) {
+                    finish(() => reject(new Error('無法讀取')));
+                }
+            };
+            f.src = url;
+            document.body.appendChild(f);
+        });
+    }
+
+    const isBlocked = r => r.status !== 200 || /cf-chl|Just a moment/i.test(r.text);
+
+    async function getBoardHtml(board) {
+        const tried = [];
+        for (const [name, fn] of [['網頁 fetch', pageFetchText], ['GM_xmlhttpRequest', gmFetchText], ['iframe', iframeFetchText]]) {
+            try {
+                const r = await fn(board.url);
+                if (!isBlocked(r)) {
+                    lastMethod = name;
+                    return r.text;
+                }
+                tried.push(`${name} HTTP ${r.status}`);
+            } catch (e) {
+                tried.push(`${name} ${e.message}`);
+            }
         }
+        const err = new Error(`讀取失敗（${tried.join('；')}），可能需要在瀏覽器重新登入或通過網站驗證`);
+        err.needsAttention = true;
+        throw err;
+    }
+
+    async function fetchBoard(board) {
+        const html = await getBoardHtml(board);
         const doc = new DOMParser().parseFromString(html, 'text/html');
         const items = [];
         const seenIds = new Set();
@@ -259,7 +327,8 @@
                     fresh: r.fresh.length,
                     firstRun: r.firstRun
                 })),
-                errors
+                errors,
+                method: lastMethod
             });
             GM_setValue(K_LOCK, null);
         }
@@ -309,6 +378,7 @@
             `Telegram：${GM_getValue(K_TG_TOKEN, '') && GM_getValue(K_TG_CHAT, '') ? '已設定' : '未設定'}`,
             ''
         ];
+        if (r && r.method) lines.push(`讀取方式：${r.method}`, '');
         if (r) {
             r.boards.forEach(b => lines.push(`${b.name}：${b.firstRun ? '首次記錄' : `新文章 ${b.fresh} 篇`}`));
             r.errors.forEach(e => lines.push('⚠️ ' + e));
