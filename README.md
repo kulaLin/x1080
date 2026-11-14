@@ -9,6 +9,7 @@
 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
 | [x1080-clean-layout](#x1080-clean-layout) | 版面精簡：隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
+| [x1080-visited-marker](#x1080-visited-marker) | 自行記錄開過的連結並淡化＋打勾，不依賴瀏覽器 :visited（Linkclump 大量開啟也有效） | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
 
@@ -118,3 +119,34 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 | `BLUR_PX` | `'8px'` | 毛玻璃模糊程度：`'0px'` = 不模糊，`'8px'` = 微毛玻璃 |
 
 > 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
+
+---
+
+## x1080-visited-marker
+
+檔案：`x1080-visited-marker.user.js`（Tampermonkey 內名稱：已開連結標記 (1080xin.com)）
+
+不問瀏覽器「這個連結造訪過沒有」，而是每個頁面載入時把自己的網址記進腳本的儲存空間，清單頁再比對這份記錄，命中的連結就淡化並加上 ✓。因此不受 Chromium `:visited` 分區化影響，用 Linkclump、中鍵、Ctrl+點擊大量開啟的分頁也會被標記。
+
+適用網域：1080xin.com、agaghhh.cc（舊網域，記錄共用）。
+
+### 快捷鍵
+
+| 按鍵 | 動作 |
+|---|---|
+| Alt + 點擊連結 | 單獨切換該連結的已開標記（不會開啟頁面） |
+| Alt + M | 把滑鼠選取範圍內的連結全部標記為已開 |
+| Alt + U | 把選取範圍內的連結取消標記 |
+| Alt + O | 用頁內點擊開啟選取範圍內尚未標記的連結（需允許此站「快顯視窗」，單次最多 60 個） |
+
+### Tampermonkey 選單
+
+開啟／關閉標記顯示、把本頁所有連結標記為已開、匯出記錄、匯入記錄（與現有合併）、清除全部記錄、顯示本頁的比對鍵值（除錯用）、重跑舊網域記錄轉換。
+
+### 設定
+
+腳本開頭的 `CONFIG` 物件，可調整標記外觀（透明度、顏色、✓ 記號、整列淡化）、網址正規化規則（`DROP_PARAMS` 等）、記錄規則與保留上限（預設 20,000 筆）。
+
+> 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
+
+> 記錄存在 Tampermonkey 這支腳本的儲存空間。從 GitHub 安裝時若被當成「新腳本」而不是「更新」，會是一份全新的空記錄，所以安裝前建議先用選單「匯出記錄」備份。
