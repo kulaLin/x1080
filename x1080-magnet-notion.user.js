@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜磁力連結面板＋Notion
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.4
+// @version      4.5
 // @description  自動提取 1080xin.com「BT綜合區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -31,6 +31,11 @@
     const MAGNET_RE = /magnet:\?xt=urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})(?:&[A-Za-z0-9%._~:\/?#\[\]@!$&()*+,;=-]*)?/gi;
     const NOTION_VERSION = '2022-06-28';
     const SUB_PAGE_TITLE = '純 magnet 連結';
+
+    // ★ 送 Notion 成功後是否自動關閉分頁（true = 關閉 / false = 不關閉）
+    const AUTO_CLOSE_TAB = true;
+    // ★ 送 Notion 成功後等幾毫秒再關閉分頁（2000 = 2 秒）；倒數期間可按「取消關閉」或 Esc 取消
+    const CLOSE_DELAY_MS = 2000;
 
     let lastKey = null;
     let collapsed = false;
@@ -396,11 +401,10 @@
             try {
                 const { added, skipped } = await doSend(cfg, magnets);
                 btn.textContent = added ? '已傳送 ✓' : '已存在';
-                setStatus(added
-                    ? `已新增 ${added} 條到 Notion` + (skipped ? `，略過重複 ${skipped} 條` : '') + '，關閉分頁…'
-                    : 'Notion 已有這些連結，關閉分頁…');
-                // 確認 Notion 寫入成功後立即關閉分頁（失敗時保留分頁）
-                window.close();
+                // 確認 Notion 寫入成功後倒數關閉分頁（失敗時保留分頁）
+                scheduleClose(added
+                    ? `已新增 ${added} 條到 Notion` + (skipped ? `，略過重複 ${skipped} 條` : '')
+                    : 'Notion 已有這些連結');
             } catch (e) {
                 btn.textContent = '失敗';
                 setStatus('傳送失敗：' + e.message, true);
@@ -535,6 +539,9 @@
                         border-top: 1px solid #eee; }
                 .status { flex: 1; font-size: 12px; color: #2a7a2a; word-break: break-all; }
                 .status.error { color: #c0392b; }
+                button.cancel-close { background: #fdecea; color: #c0392b; font-weight: bold; }
+                button.cancel-close:hover { background: #f9d6d2; }
+                button[hidden] { display: none; }
             </style>
             <div class="panel">
                 <div class="head" title="點擊收合 / 展開">
@@ -545,6 +552,7 @@
                 <div class="list"></div>
                 <div class="foot">
                     <button class="tidy notion" title="刪除 Notion 中重複的 magnet，並同步子頁面">整理 Notion</button>
+                    <button class="cancel-close" hidden title="也可以按 Esc">取消關閉</button>
                     <span class="status"></span>
                 </div>
             </div>`;
@@ -557,8 +565,54 @@
 
         const tidyBtn = shadow.querySelector('.tidy');
         tidyBtn.addEventListener('click', () => tidyNotion(tidyBtn));
+        shadow.querySelector('.cancel-close').addEventListener('click', () => cancelClose('已取消關閉分頁'));
 
         document.body.appendChild(host);
+    }
+
+    /* ---------- 倒數關閉分頁 ---------- */
+
+    let closeTimer = null;
+    let closeTick = null;
+
+    function onEscCancel(e) {
+        if (e.key === 'Escape') cancelClose('已取消關閉分頁');
+    }
+
+    function cancelClose(msg) {
+        clearTimeout(closeTimer);
+        clearInterval(closeTick);
+        closeTimer = closeTick = null;
+        document.removeEventListener('keydown', onEscCancel, true);
+        if (shadow) shadow.querySelector('.cancel-close').hidden = true;
+        if (msg) setStatus(msg);
+    }
+
+    function scheduleClose(baseMsg) {
+        if (!AUTO_CLOSE_TAB) {
+            setStatus(baseMsg);
+            return;
+        }
+        cancelClose();
+        // 面板收合時先展開，才看得到倒數與「取消關閉」
+        if (shadow && collapsed) {
+            collapsed = false;
+            shadow.querySelector('.panel').classList.remove('collapsed');
+        }
+        const end = Date.now() + CLOSE_DELAY_MS;
+        const render = () => {
+            const left = Math.max(0, (end - Date.now()) / 1000).toFixed(1);
+            setStatus(`${baseMsg}，${left} 秒後關閉分頁`);
+        };
+        render();
+        if (shadow) shadow.querySelector('.cancel-close').hidden = false;
+        closeTick = setInterval(render, 100);
+        document.addEventListener('keydown', onEscCancel, true);
+        closeTimer = setTimeout(() => {
+            cancelClose();
+            setStatus(`${baseMsg}，關閉分頁…`);
+            window.close();
+        }, CLOSE_DELAY_MS);
     }
 
     let statusTimer = null;
@@ -654,6 +708,7 @@
     }
 
     function removePanel() {
+        cancelClose(); // 換到其他頁面就不再自動關閉
         const host = document.getElementById(HOST_ID);
         if (host) host.remove();
         shadow = null;
