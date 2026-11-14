@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         1080xin 磁力連結右側懸浮面板
 // @namespace    http://tampermonkey.net/
-// @version      3.1
-// @description  自動提取 1080xin.com 頁面內的 magnet 連結，以「下載地址」面板顯示於網頁右側，並可一鍵傳送到 Notion 頁面
+// @version      4.0
+// @description  自動提取 1080xin.com 頁面內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
 // @run-at       document-idle
@@ -27,6 +27,7 @@
     // btih 為 40 位 hex 或 32 位 base32；後面的參數必須以 & 開頭，避免把緊鄰的文字吃進來
     const MAGNET_RE = /magnet:\?xt=urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})(?:&[A-Za-z0-9%._~:\/?#\[\]@!$&()*+,;=-]*)?/gi;
     const NOTION_VERSION = '2022-06-28';
+    const SUB_PAGE_TITLE = '純 magnet 連結';
 
     let lastKey = null;
     let collapsed = false;
@@ -137,6 +138,7 @@
         GM_deleteValue('notionToken');
         GM_deleteValue('notionPageUrl');
         GM_deleteValue('notionPageId');
+        GM_deleteValue('notionSubPageId');
         setStatus('已清除 Notion 設定');
     }
 
@@ -151,7 +153,9 @@
         return { token, pageId };
     }
 
-    function notionRequest(token, method, path, body) {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    function notionRequestOnce(token, method, path, body) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method,
@@ -168,14 +172,107 @@
                     if (res.status >= 200 && res.status < 300) return resolve(json);
                     let msg = (json && json.message) || ('HTTP ' + res.status);
                     if (res.status === 401) msg = 'token 無效，請從油猴選單重新設定';
-                    if (res.status === 404) msg = '找不到頁面：請在該 Notion 頁面右上角「⋯ → 連線」加入你的 integration';
-                    reject(new Error(msg));
+                    if (res.status === 404) msg = '找不到頁面：請確認該頁面已在 integration 的「內容存取權限」中勾選';
+                    const err = new Error(msg);
+                    err.status = res.status;
+                    const m = /retry-after:\s*(\d+)/i.exec(res.responseHeaders || '');
+                    err.retryAfter = m ? parseInt(m[1], 10) : 1;
+                    reject(err);
                 },
                 onerror() { reject(new Error('無法連線到 Notion')); },
                 ontimeout() { reject(new Error('連線逾時')); },
                 timeout: 20000
             });
         });
+    }
+
+    // 遇到 Notion 限流（429）時自動等待後重試
+    async function notionRequest(token, method, path, body) {
+        for (let attempt = 0; ; attempt++) {
+            try {
+                return await notionRequestOnce(token, method, path, body);
+            } catch (e) {
+                if (e.status === 429 && attempt < 3) {
+                    await sleep((e.retryAfter || 1) * 1000);
+                    continue;
+                }
+                throw e;
+            }
+        }
+    }
+
+    // 同一時間只跑一個 Notion 工作，避免連按造成重複寫入
+    let notionQueue = Promise.resolve();
+    function enqueue(fn) {
+        const p = notionQueue.then(fn, fn);
+        notionQueue = p.catch(() => {});
+        return p;
+    }
+
+    async function listChildren(token, blockId) {
+        const all = [];
+        let cursor = null;
+        do {
+            const q = '?page_size=100' + (cursor ? '&start_cursor=' + encodeURIComponent(cursor) : '');
+            const res = await notionRequest(token, 'GET', `/v1/blocks/${blockId}/children${q}`);
+            all.push(...res.results);
+            cursor = res.has_more ? res.next_cursor : null;
+        } while (cursor);
+        return all;
+    }
+
+    async function appendBlocks(token, blockId, blocks) {
+        // API 每次最多 100 個區塊
+        for (let i = 0; i < blocks.length; i += 100) {
+            await notionRequest(token, 'PATCH', `/v1/blocks/${blockId}/children`, {
+                children: blocks.slice(i, i + 100)
+            });
+        }
+    }
+
+    function blockText(b) {
+        const data = b[b.type];
+        if (!data || !Array.isArray(data.rich_text)) return '';
+        return data.rich_text.map(t => t.plain_text || '').join('');
+    }
+
+    function hashOf(text) {
+        const m = /btih:([a-z0-9]{32,40})/i.exec(text || '');
+        return m ? m[1].toLowerCase() : null;
+    }
+
+    function magnetOf(text) {
+        const m = (text || '').match(MAGNET_RE);
+        return m ? m[0] : null;
+    }
+
+    // 主頁面中由腳本寫入的標題列（帖子標題 + 時間，帶網址連結）
+    function isGroupHeader(b) {
+        if (b.type !== 'paragraph') return false;
+        const rt = b.paragraph.rich_text || [];
+        return rt.some(t => t.href && /^https?:/i.test(t.href)) && !hashOf(blockText(b));
+    }
+
+    // 找主頁面底下的「純 magnet 連結」子頁面，沒有就自動建立
+    async function findOrCreateSubPage(cfg, mainChildren) {
+        const cached = GM_getValue('notionSubPageId', '');
+        const subs = mainChildren.filter(b => b.type === 'child_page');
+        const found = subs.find(b => b.id === cached) || subs.find(b => b.child_page.title === SUB_PAGE_TITLE);
+        if (found) {
+            GM_setValue('notionSubPageId', found.id);
+            return found.id;
+        }
+        const page = await notionRequest(cfg.token, 'POST', '/v1/pages', {
+            parent: { page_id: cfg.pageId },
+            icon: { type: 'emoji', emoji: '🔗' },
+            properties: { title: { title: [{ type: 'text', text: { content: SUB_PAGE_TITLE } }] } }
+        });
+        GM_setValue('notionSubPageId', page.id);
+        return page.id;
+    }
+
+    function plainMagnetBlock(m) {
+        return { object: 'block', type: 'paragraph', paragraph: { rich_text: richText(m) } };
     }
 
     // Notion 單一文字物件上限 2000 字，超過就切段
@@ -220,33 +317,119 @@
         return [header, ...codes];
     }
 
-    async function sendToNotion(magnets, btn) {
+    // 傳送：主頁面與子頁面各自比對，已存在的 magnet（同 hash）一律略過
+    async function doSend(cfg, magnets) {
+        const mainChildren = await listChildren(cfg.token, cfg.pageId);
+        const mainHashes = new Set(mainChildren.map(b => hashOf(blockText(b))).filter(Boolean));
+        const newMain = magnets.filter(m => !mainHashes.has(hashOf(m)));
+        if (newMain.length) await appendBlocks(cfg.token, cfg.pageId, buildBlocks(newMain));
+
+        const subId = await findOrCreateSubPage(cfg, mainChildren);
+        const subChildren = await listChildren(cfg.token, subId);
+        const subHashes = new Set(subChildren.map(b => hashOf(blockText(b))).filter(Boolean));
+        const newSub = magnets.filter(m => !subHashes.has(hashOf(m)));
+        if (newSub.length) await appendBlocks(cfg.token, subId, newSub.map(plainMagnetBlock));
+
+        return { added: newMain.length, skipped: magnets.length - newMain.length };
+    }
+
+    function sendToNotion(magnets, btn) {
         const cfg = getNotionConfig();
         if (!cfg) return;
 
         const oldText = btn.textContent;
         btn.disabled = true;
         btn.textContent = '傳送中…';
-        try {
-            const blocks = buildBlocks(magnets);
-            // API 每次最多 100 個區塊
-            for (let i = 0; i < blocks.length; i += 100) {
-                await notionRequest(cfg.token, 'PATCH', `/v1/blocks/${cfg.pageId}/children`, {
-                    children: blocks.slice(i, i + 100)
-                });
+        return enqueue(async () => {
+            try {
+                const { added, skipped } = await doSend(cfg, magnets);
+                if (added === 0) {
+                    btn.textContent = '已存在';
+                    setStatus('Notion 已有這些連結，未重複寫入');
+                } else {
+                    btn.textContent = '已傳送 ✓';
+                    setStatus(`已新增 ${added} 條到 Notion` + (skipped ? `，略過重複 ${skipped} 條` : ''));
+                }
+            } catch (e) {
+                btn.textContent = '失敗';
+                setStatus('傳送失敗：' + e.message, true);
+            } finally {
+                btn.disabled = false;
+                setTimeout(() => { btn.textContent = oldText; }, 2000);
             }
-            btn.textContent = '已傳送 ✓';
-            setStatus(`已傳送 ${magnets.length} 條到 Notion`);
-        } catch (e) {
-            btn.textContent = '失敗';
-            setStatus('傳送失敗：' + e.message, true);
-        } finally {
-            btn.disabled = false;
-            setTimeout(() => { btn.textContent = oldText; }, 2000);
+        });
+    }
+
+    // 整理：刪除主頁面與子頁面中重複的 magnet，並把主頁面有、子頁面沒有的補進子頁面
+    async function doTidy(cfg) {
+        let removed = 0;
+
+        const mainChildren = await listChildren(cfg.token, cfg.pageId);
+        const seen = new Map(); // hash -> magnet 文字（保留第一次出現的）
+        const toDelete = [];
+        let header = null, had = 0, kept = 0;
+        const closeGroup = () => {
+            // 整組 magnet 都是重複的，就連同該組標題列一起刪掉
+            if (header && had > 0 && kept === 0) toDelete.push(header.id);
+        };
+        for (const b of mainChildren) {
+            const text = blockText(b);
+            const h = hashOf(text);
+            if (h) {
+                had++;
+                if (seen.has(h)) toDelete.push(b.id);
+                else { seen.set(h, magnetOf(text) || text.trim()); kept++; }
+            } else if (isGroupHeader(b)) {
+                closeGroup();
+                header = b; had = 0; kept = 0;
+            }
         }
+        closeGroup();
+
+        const subId = await findOrCreateSubPage(cfg, mainChildren);
+        const subChildren = await listChildren(cfg.token, subId);
+        const subSeen = new Set();
+        for (const b of subChildren) {
+            const h = hashOf(blockText(b));
+            if (!h) continue;
+            if (subSeen.has(h)) toDelete.push(b.id);
+            else subSeen.add(h);
+        }
+
+        for (const id of toDelete) {
+            setStatus(`整理中…刪除重複 ${++removed}/${toDelete.length}`);
+            await notionRequest(cfg.token, 'DELETE', `/v1/blocks/${id}`);
+            await sleep(350); // Notion 每秒約 3 次請求的限制
+        }
+
+        const missing = [...seen.entries()].filter(([h]) => !subSeen.has(h)).map(([, m]) => m);
+        if (missing.length) await appendBlocks(cfg.token, subId, missing.map(plainMagnetBlock));
+
+        return { removed: toDelete.length, synced: missing.length };
+    }
+
+    function tidyNotion(btn) {
+        const cfg = getNotionConfig();
+        if (!cfg) return;
+        if (btn) btn.disabled = true;
+        setStatus('整理中…');
+        return enqueue(async () => {
+            try {
+                const { removed, synced } = await doTidy(cfg);
+                setStatus(
+                    (removed ? `已刪除 ${removed} 個重複區塊` : '沒有重複的連結') +
+                    (synced ? `，子頁面補上 ${synced} 條` : '')
+                );
+            } catch (e) {
+                setStatus('整理失敗：' + e.message, true);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        });
     }
 
     GM_registerMenuCommand('設定 Notion（token 與頁面）', configureNotion);
+    GM_registerMenuCommand('整理 Notion（去除重複＋同步子頁面）', () => tidyNotion());
     GM_registerMenuCommand('清除 Notion 設定', clearNotionConfig);
 
     /* ---------- 面板 ---------- */
@@ -269,7 +452,7 @@
                          font: 13px/1.5 "Microsoft JhengHei", "PingFang TC", sans-serif; }
                 .panel.collapsed { width: auto; }
                 .panel.collapsed .list, .panel.collapsed .copy-all,
-                .panel.collapsed .send-all, .panel.collapsed .status { display: none; }
+                .panel.collapsed .send-all, .panel.collapsed .foot { display: none; }
                 .head { display: flex; align-items: center; gap: 6px; padding: 8px 10px;
                         background: #2d6cdf; color: #fff; border-radius: 8px 0 0 0; cursor: pointer;
                         user-select: none; }
@@ -289,8 +472,9 @@
                 .item a { flex: 1; color: #2d6cdf; text-decoration: none; word-break: break-all; }
                 .item a:hover { text-decoration: underline; }
                 .empty { color: #888; padding: 6px 0; }
-                .status { padding: 4px 10px 6px; font-size: 12px; color: #2a7a2a; border-top: 1px solid #eee; }
-                .status:empty { display: none; }
+                .foot { display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+                        border-top: 1px solid #eee; }
+                .status { flex: 1; font-size: 12px; color: #2a7a2a; word-break: break-all; }
                 .status.error { color: #c0392b; }
             </style>
             <div class="panel">
@@ -300,7 +484,10 @@
                     <span class="title">下載地址：</span>
                 </div>
                 <div class="list"></div>
-                <div class="status"></div>
+                <div class="foot">
+                    <button class="tidy notion" title="刪除 Notion 中重複的 magnet，並同步子頁面">整理 Notion</button>
+                    <span class="status"></span>
+                </div>
             </div>`;
 
         shadow.querySelector('.head').addEventListener('click', e => {
@@ -308,6 +495,9 @@
             collapsed = !collapsed;
             shadow.querySelector('.panel').classList.toggle('collapsed', collapsed);
         });
+
+        const tidyBtn = shadow.querySelector('.tidy');
+        tidyBtn.addEventListener('click', () => tidyNotion(tidyBtn));
 
         document.body.appendChild(host);
     }
