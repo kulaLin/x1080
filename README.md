@@ -10,6 +10,7 @@
 | [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區） | [x1080-clean-layout](#x1080-clean-layout) | 隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
 | [x1080] 瀏覽｜已開連結標記 | [x1080-visited-marker](#x1080-visited-marker) | 自行記錄開過的連結並淡化＋打勾，不依賴瀏覽器 :visited（Linkclump 大量開啟也有效） | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
+| [x1080] 瀏覽｜板塊新文章通知 | [x1080-board-watch](#x1080-board-watch) | 定時檢查關注的板塊，有新文章就用 Telegram 與桌面通知提醒 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js) |
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
 
@@ -187,3 +188,50 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 ### 已知問題（待改版）
 
 - **同一篇文章因網址參數不同被當成多筆**（2026-11-15 記錄）：網站文章網址為 `/resources/<id>`，但列表上的連結帶 `?return=…`（依來源列表而不同），進入文章後網址列變成 `?page=1&order=asc`。比對鍵值會把這些參數算進去，所以從不同列表頁進同一篇文章，可能不會互相顯示「已開」。修正方向是比對時只看文章 id，並把現有記錄一次轉換合併。詳細原因與修正方向見腳本 `keyOf()` 上方的「[已知問題]」註解。
+
+---
+
+## x1080-board-watch
+
+檔案：`x1080-board-watch.user.js`（Tampermonkey 名稱：[x1080] 瀏覽｜板塊新文章通知）
+
+網站沒有 RSS，也沒有「關注板塊」功能，而且不帶登入狀態的請求會被 Cloudflare 擋下（403），所以不能放在伺服器上排程檢查。這支腳本改在已登入的瀏覽器裡執行：定時讀取關注的板塊，跟已看過的文章比對，有新文章就通知。
+
+### 運作方式
+
+- 每 10 分鐘讀一次關注的板塊（每個板塊之間間隔 3 秒）
+- 第一次執行只記錄現有文章，不通知；之後只通知沒看過的文章（置頂公告也只在第一次被記錄）
+- 通知：Telegram（標題＋連結，可點開）＋ Windows 桌面通知（點擊開啟文章）；同一板塊一次超過 3 篇時，桌面通知合併成一則
+- 同時開多個 1080xin 分頁時，只有一個分頁負責檢查，不會重複通知
+- 讀取失敗（例如登入過期、網站驗證）或網站版面改變時，最多每 6 小時提醒一次
+
+### 限制
+
+- **需保留至少一個 1080xin 分頁開著**（建議釘選）；電腦睡眠或 Chrome 關閉時不會檢查，恢復後的下一次檢查會補上
+- 兩次檢查之間某板塊新文章超過一整頁（約 23 篇）時，可能漏掉被擠到第二頁的文章，通知會註明「可能還有更多」
+
+### 第一次使用
+
+1. 從上方腳本列表安裝
+2. Tampermonkey 選單 →「設定 Telegram（bot token 與 chat id）」，依序貼上 bot token（向 @BotFather 取得）與自己的 chat id
+3. 選單 →「測試 Telegram 通知」，確認手機收到訊息
+4. 選單 →「立即檢查」，第一次會記錄各板塊現有文章；之後每 10 分鐘自動檢查
+
+Telegram token 與 chat id 只存在本機 Tampermonkey 中，不在此 repo。
+
+### Tampermonkey 選單
+
+立即檢查、顯示監控狀態、暫停／恢復監控、設定 Telegram、測試 Telegram 通知、重設已看過的文章（下次只記錄不通知）。
+
+### 設定（腳本開頭的常數）
+
+| 常數 | 預設 | 說明 |
+|---|---|---|
+| `BOARDS` | 高清有碼、外挂字幕、亞洲SM、BT綜合區（無碼HD） | 關注的板塊名稱與網址，可帶 `category_id` 篩選分類 |
+| `CHECK_INTERVAL_MIN` | `10` | 幾分鐘檢查一次 |
+| `NOTIFY_TELEGRAM` | `true` | 是否用 Telegram 通知 |
+| `NOTIFY_DESKTOP` | `true` | 是否用桌面通知 |
+| `TELEGRAM_SHOW_TITLES` | `true` | Telegram 是否列出標題；`false` 只通知「某板塊有 N 篇新文章」，手機鎖定畫面比較不會露出標題 |
+| `GAP_BETWEEN_BOARDS_MS` | `3000` | 讀取各板塊之間的間隔 |
+
+> 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
