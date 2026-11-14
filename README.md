@@ -7,6 +7,7 @@
 |---|---|---|
 | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
+| [x1080-clean-layout](#x1080-clean-layout) | 版面精簡：隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
 
@@ -70,3 +71,23 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 ### 已知問題（待改版）
 
 - **同一分頁切換文章時，一鍵提取按鈕不會更新**（2026-11-15 記錄）：網站換頁不會重新載入，懸浮按鈕只在第一次出現時記住當頁的下載按鈕，換到其他文章後，數量與點擊對象仍停留在第一篇，點了會等到超時；換到沒有附件的頁面時按鈕也不會消失。每篇文章開新分頁使用則不受影響。詳細原因與修正方向見腳本內「[已知問題]」註解。
+
+---
+
+## x1080-clean-layout
+
+檔案：`x1080-clean-layout.user.js`（Tampermonkey 內名稱：1080xin 版面精簡（隱藏頂部數據、簽名檔廣告與底部回覆區））
+
+適用網域：1080xin.com、x1080x.com（含子網域）。以 CSS 在頁面載入前就隱藏，不會閃一下才消失。
+
+### 隱藏的區塊
+
+| 區塊 | CSS 選擇器 |
+|---|---|
+| 標題區的查看／回覆統計、收藏與回覆主題按鈕 | `.thread-header-nums` |
+| 主文底部「論壇VIP」簽名檔廣告 | `.author-signature` |
+| 主文底部「回覆／引用／檢舉」按鈕列 | `.post-foot` |
+| 底部互動區（回覆輸入框、編輯器、發佈按鈕） | `.thread-interactions` |
+| 一樓（主文）以外的所有樓層與「還沒有回覆」 | `.post-list > *:nth-child(n+2)` |
+
+另外縮小 `.thread-header` 的間距，讓主文往上貼齊。網站改版、class 名稱變動時，對照上表修改即可。
