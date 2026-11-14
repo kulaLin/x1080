@@ -1,0 +1,423 @@
+// ==UserScript==
+// @name         1080xin 磁力連結右側懸浮面板
+// @namespace    http://tampermonkey.net/
+// @version      3.1
+// @description  自動提取 1080xin.com 頁面內的 magnet 連結，以「下載地址」面板顯示於網頁右側，並可一鍵傳送到 Notion 頁面
+// @match        *://1080xin.com/*
+// @match        *://*.1080xin.com/*
+// @run-at       document-idle
+// @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_deleteValue
+// @grant        GM_registerMenuCommand
+// @connect      api.notion.com
+// @homepageURL  https://github.com/kulaLin/x1080
+// @updateURL    https://raw.githubusercontent.com/kulaLin/x1080/main/1080xin-magnet-panel.user.js
+// @downloadURL  https://raw.githubusercontent.com/kulaLin/x1080/main/1080xin-magnet-panel.user.js
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // 只在最上層頁面執行，避免在 iframe 內重複出現面板
+    if (window.top !== window.self) return;
+
+    const HOST_ID = 'magnet-panel-host';
+    // btih 為 40 位 hex 或 32 位 base32；後面的參數必須以 & 開頭，避免把緊鄰的文字吃進來
+    const MAGNET_RE = /magnet:\?xt=urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})(?:&[A-Za-z0-9%._~:\/?#\[\]@!$&()*+,;=-]*)?/gi;
+    const NOTION_VERSION = '2022-06-28';
+
+    let lastKey = null;
+    let collapsed = false;
+    let shadow = null;
+
+    /* ---------- 提取 ---------- */
+
+    function collectFrom(text, map) {
+        if (!text || text.indexOf('magnet:') === -1) return;
+        const matches = text.match(MAGNET_RE);
+        if (!matches) return;
+        matches.forEach(m => {
+            const hash = m.match(/btih:([a-z0-9]+)/i)[1].toLowerCase();
+            // 同一個 hash 保留資訊較完整（較長）的那條
+            if (!map.has(hash) || map.get(hash).length < m.length) map.set(hash, m);
+        });
+    }
+
+    function extractMagnets() {
+        const map = new Map();
+
+        // 1. <a href="magnet:...">
+        document.querySelectorAll('a[href^="magnet:" i]').forEach(a => {
+            collectFrom(a.getAttribute('href'), map);
+        });
+
+        // 2. 程式碼區塊（.discuz-code-box、Discuz 常見的 .blockcode 等）
+        document.querySelectorAll('.discuz-code-box, .blockcode, code, pre').forEach(el => {
+            collectFrom(el.textContent, map);
+        });
+
+        // 3. 其餘純文字（例如「下載地址：magnet:?xt=...」直接寫在內文）
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const p = node.parentNode;
+                if (p && (p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE')) return NodeFilter.FILTER_REJECT;
+                return node.nodeValue.indexOf('magnet:') !== -1
+                    ? NodeFilter.FILTER_ACCEPT
+                    : NodeFilter.FILTER_SKIP;
+            }
+        });
+        let n;
+        while ((n = walker.nextNode())) collectFrom(n.nodeValue, map);
+
+        // 4. input / textarea 內的值
+        document.querySelectorAll('input[value*="magnet:"], textarea').forEach(el => {
+            collectFrom(el.value, map);
+        });
+
+        return Array.from(map.values());
+    }
+
+    function getDisplayName(magnetUrl) {
+        try {
+            const params = new URLSearchParams(magnetUrl.split('?')[1]);
+            const dn = params.get('dn');
+            if (dn) return dn;
+        } catch (e) { /* ignore */ }
+        const m = magnetUrl.match(/btih:([a-z0-9]+)/i);
+        return m ? m[1] : magnetUrl;
+    }
+
+    function getPageTitle() {
+        const subject = document.querySelector('#thread_subject');
+        const t = (subject ? subject.textContent : document.title).trim();
+        return t || location.href;
+    }
+
+    /* ---------- Notion ---------- */
+
+    function parsePageId(input) {
+        if (!input) return null;
+        const s = input.trim().split(/[?#]/)[0].replace(/\/+$/, '');
+        const m = s.match(/([0-9a-f]{8})-?([0-9a-f]{4})-?([0-9a-f]{4})-?([0-9a-f]{4})-?([0-9a-f]{12})$/i);
+        return m ? m.slice(1).join('-').toLowerCase() : null;
+    }
+
+    function configureNotion() {
+        const hasToken = !!GM_getValue('notionToken', '');
+        const tokenInput = prompt(
+            '請輸入 Notion integration token（ntn_ 或 secret_ 開頭）' +
+            (hasToken ? '\n留空則沿用目前已儲存的 token' : ''),
+            ''
+        );
+        if (tokenInput === null) return false;
+        const token = tokenInput.trim() || GM_getValue('notionToken', '');
+        if (!/^(ntn_|secret_)/.test(token)) {
+            alert('token 格式不正確，應以 ntn_ 或 secret_ 開頭');
+            return false;
+        }
+
+        const pageInput = prompt('請貼上要寫入的 Notion 頁面網址（或頁面 ID）：', GM_getValue('notionPageUrl', ''));
+        if (pageInput === null) return false;
+        const pageId = parsePageId(pageInput);
+        if (!pageId) {
+            alert('找不到頁面 ID，請確認貼上的是 Notion 頁面網址');
+            return false;
+        }
+
+        GM_setValue('notionToken', token);
+        GM_setValue('notionPageUrl', pageInput.trim());
+        GM_setValue('notionPageId', pageId);
+        setStatus('Notion 設定已儲存');
+        return true;
+    }
+
+    function clearNotionConfig() {
+        GM_deleteValue('notionToken');
+        GM_deleteValue('notionPageUrl');
+        GM_deleteValue('notionPageId');
+        setStatus('已清除 Notion 設定');
+    }
+
+    function getNotionConfig() {
+        let token = GM_getValue('notionToken', '');
+        let pageId = GM_getValue('notionPageId', '');
+        if (!token || !pageId) {
+            if (!configureNotion()) return null;
+            token = GM_getValue('notionToken', '');
+            pageId = GM_getValue('notionPageId', '');
+        }
+        return { token, pageId };
+    }
+
+    function notionRequest(token, method, path, body) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method,
+                url: 'https://api.notion.com' + path,
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Notion-Version': NOTION_VERSION,
+                    'Content-Type': 'application/json'
+                },
+                data: body ? JSON.stringify(body) : undefined,
+                onload(res) {
+                    let json = null;
+                    try { json = JSON.parse(res.responseText); } catch (e) { /* ignore */ }
+                    if (res.status >= 200 && res.status < 300) return resolve(json);
+                    let msg = (json && json.message) || ('HTTP ' + res.status);
+                    if (res.status === 401) msg = 'token 無效，請從油猴選單重新設定';
+                    if (res.status === 404) msg = '找不到頁面：請在該 Notion 頁面右上角「⋯ → 連線」加入你的 integration';
+                    reject(new Error(msg));
+                },
+                onerror() { reject(new Error('無法連線到 Notion')); },
+                ontimeout() { reject(new Error('連線逾時')); },
+                timeout: 20000
+            });
+        });
+    }
+
+    // Notion 單一文字物件上限 2000 字，超過就切段
+    function richText(str) {
+        const out = [];
+        for (let i = 0; i < str.length; i += 2000) {
+            out.push({ type: 'text', text: { content: str.slice(i, i + 2000) } });
+        }
+        return out;
+    }
+
+    function buildBlocks(magnets) {
+        const now = new Date().toLocaleString('zh-TW', { hour12: false });
+        const header = {
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+                rich_text: [
+                    {
+                        type: 'text',
+                        text: { content: getPageTitle().slice(0, 2000), link: { url: location.href } },
+                        annotations: { bold: true }
+                    },
+                    {
+                        type: 'text',
+                        text: { content: '　' + now },
+                        annotations: { color: 'gray' }
+                    }
+                ]
+            }
+        };
+        // 每條 magnet 放在程式碼區塊，Notion 內滑過即可一鍵複製；名稱放在區塊說明
+        const codes = magnets.map(m => ({
+            object: 'block',
+            type: 'code',
+            code: {
+                language: 'plain text',
+                rich_text: richText(m),
+                caption: richText(getDisplayName(m)).slice(0, 1)
+            }
+        }));
+        return [header, ...codes];
+    }
+
+    async function sendToNotion(magnets, btn) {
+        const cfg = getNotionConfig();
+        if (!cfg) return;
+
+        const oldText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '傳送中…';
+        try {
+            const blocks = buildBlocks(magnets);
+            // API 每次最多 100 個區塊
+            for (let i = 0; i < blocks.length; i += 100) {
+                await notionRequest(cfg.token, 'PATCH', `/v1/blocks/${cfg.pageId}/children`, {
+                    children: blocks.slice(i, i + 100)
+                });
+            }
+            btn.textContent = '已傳送 ✓';
+            setStatus(`已傳送 ${magnets.length} 條到 Notion`);
+        } catch (e) {
+            btn.textContent = '失敗';
+            setStatus('傳送失敗：' + e.message, true);
+        } finally {
+            btn.disabled = false;
+            setTimeout(() => { btn.textContent = oldText; }, 2000);
+        }
+    }
+
+    GM_registerMenuCommand('設定 Notion（token 與頁面）', configureNotion);
+    GM_registerMenuCommand('清除 Notion 設定', clearNotionConfig);
+
+    /* ---------- 面板 ---------- */
+
+    function ensurePanel() {
+        let host = document.getElementById(HOST_ID);
+        if (host && shadow) return;
+        if (host) host.remove();
+
+        host = document.createElement('div');
+        host.id = HOST_ID;
+        host.style.cssText = 'position:fixed;top:200px;right:0;z-index:2147483647;';
+        // 使用 Shadow DOM：樣式不受網站 CSS 影響，面板內容也不會被自己再掃描到
+        shadow = host.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+            <style>
+                .panel { width: 340px; max-height: 70vh; display: flex; flex-direction: column;
+                         background: #fff; color: #222; border: 1px solid #ccc; border-right: none;
+                         border-radius: 8px 0 0 8px; box-shadow: -2px 2px 10px rgba(0,0,0,.2);
+                         font: 13px/1.5 "Microsoft JhengHei", "PingFang TC", sans-serif; }
+                .panel.collapsed { width: auto; }
+                .panel.collapsed .list, .panel.collapsed .copy-all,
+                .panel.collapsed .send-all, .panel.collapsed .status { display: none; }
+                .head { display: flex; align-items: center; gap: 6px; padding: 8px 10px;
+                        background: #2d6cdf; color: #fff; border-radius: 8px 0 0 0; cursor: pointer;
+                        user-select: none; }
+                .panel.collapsed .head { border-radius: 8px 0 0 8px; }
+                .title { flex: 1; font-weight: bold; white-space: nowrap; }
+                button { cursor: pointer; border: none; border-radius: 4px; padding: 2px 8px;
+                         font-size: 12px; background: #eef3fd; color: #2d6cdf; white-space: nowrap;
+                         flex-shrink: 0; }
+                button:hover { background: #dbe6fb; }
+                button:disabled { opacity: .6; cursor: default; }
+                button.notion { background: #f1f1ef; color: #37352f; }
+                button.notion:hover { background: #e3e2df; }
+                .list { overflow-y: auto; padding: 6px 10px; }
+                .item { display: flex; align-items: center; gap: 6px; padding: 6px 0;
+                        border-bottom: 1px dashed #ddd; }
+                .item:last-child { border-bottom: none; }
+                .item a { flex: 1; color: #2d6cdf; text-decoration: none; word-break: break-all; }
+                .item a:hover { text-decoration: underline; }
+                .empty { color: #888; padding: 6px 0; }
+                .status { padding: 4px 10px 6px; font-size: 12px; color: #2a7a2a; border-top: 1px solid #eee; }
+                .status:empty { display: none; }
+                .status.error { color: #c0392b; }
+            </style>
+            <div class="panel">
+                <div class="head" title="點擊收合 / 展開">
+                    <button class="copy-all">全部複製</button>
+                    <button class="send-all notion">全部送 Notion</button>
+                    <span class="title">下載地址：</span>
+                </div>
+                <div class="list"></div>
+                <div class="status"></div>
+            </div>`;
+
+        shadow.querySelector('.head').addEventListener('click', e => {
+            if (e.target.closest('button')) return;
+            collapsed = !collapsed;
+            shadow.querySelector('.panel').classList.toggle('collapsed', collapsed);
+        });
+
+        document.body.appendChild(host);
+    }
+
+    let statusTimer = null;
+    function setStatus(msg, isError) {
+        if (!shadow) return;
+        const el = shadow.querySelector('.status');
+        el.textContent = msg;
+        el.classList.toggle('error', !!isError);
+        clearTimeout(statusTimer);
+        if (!isError) statusTimer = setTimeout(() => { el.textContent = ''; }, 4000);
+    }
+
+    function copyText(text, btn) {
+        const done = () => {
+            const old = btn.textContent;
+            btn.textContent = '已複製';
+            setTimeout(() => { btn.textContent = old; }, 1200);
+        };
+        const fallback = () => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
+            ta.remove();
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done, fallback);
+        } else {
+            fallback();
+        }
+    }
+
+    function render(magnets) {
+        ensurePanel();
+        const list = shadow.querySelector('.list');
+        const title = shadow.querySelector('.title');
+        const copyAll = shadow.querySelector('.copy-all');
+        const sendAll = shadow.querySelector('.send-all');
+
+        title.textContent = `下載地址：（${magnets.length}）`;
+        list.textContent = '';
+
+        if (magnets.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty';
+            empty.textContent = '本頁尚未找到 magnet 連結';
+            list.appendChild(empty);
+            copyAll.style.display = 'none';
+            sendAll.style.display = 'none';
+            return;
+        }
+
+        copyAll.style.display = '';
+        sendAll.style.display = '';
+        copyAll.onclick = () => copyText(magnets.join('\n'), copyAll);
+        sendAll.onclick = () => sendToNotion(magnets, sendAll);
+
+        magnets.forEach(m => {
+            const item = document.createElement('div');
+            item.className = 'item';
+
+            const copyBtn = document.createElement('button');
+            copyBtn.textContent = '複製';
+            copyBtn.addEventListener('click', () => copyText(m, copyBtn));
+
+            const sendBtn = document.createElement('button');
+            sendBtn.className = 'notion';
+            sendBtn.textContent = 'Notion';
+            sendBtn.title = '傳送這一條到 Notion';
+            sendBtn.addEventListener('click', () => sendToNotion([m], sendBtn));
+
+            const a = document.createElement('a');
+            a.href = m;
+            a.textContent = getDisplayName(m);
+            a.title = m;
+
+            item.appendChild(copyBtn);
+            item.appendChild(sendBtn);
+            item.appendChild(a);
+            list.appendChild(item);
+        });
+    }
+
+    /* ---------- 更新 ---------- */
+
+    function update() {
+        if (!document.body) return;
+        const magnets = extractMagnets();
+        const key = magnets.join('\n');
+        if (key === lastKey && document.getElementById(HOST_ID)) return;
+        lastKey = key;
+        render(magnets);
+    }
+
+    let timer = null;
+    function scheduleUpdate() {
+        clearTimeout(timer);
+        timer = setTimeout(update, 400);
+    }
+
+    update();
+
+    // 內容為動態載入（或換頁不重新整理）時也能更新
+    new MutationObserver(scheduleUpdate).observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+})();
