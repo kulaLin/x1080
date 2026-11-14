@@ -495,6 +495,11 @@
 
         host = document.createElement('div');
         host.id = HOST_ID;
+        // [已知問題] 2026-11-15 記錄，待實際確認後調整
+        // 與 x1080-attachment-panel 位置重疊：本面板在右側 top:200px、寬 340px；
+        // 附件懸浮區塊在右側 top:260px（TOP_OFFSET）、寬 280px、z-index 999999。
+        // 同一篇文章同時有 magnet 與附件時，兩者會疊在一起，本面板 z-index 較高，會蓋住附件區塊。
+        // 調整方向：把其中一個往下移、改到左側，或依附件區塊實際高度自動錯開。
         host.style.cssText = 'position:fixed;top:200px;right:0;z-index:2147483647;';
         // 使用 Shadow DOM：樣式不受網站 CSS 影響，面板內容也不會被自己再掃描到
         shadow = host.attachShadow({ mode: 'open' });

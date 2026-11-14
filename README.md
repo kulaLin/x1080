@@ -13,11 +13,17 @@
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
 
+### 腳本之間的已知衝突（待確認）
+
+- **x1080-magnet-notion 與 x1080-attachment-panel 位置重疊**（2026-11-15 記錄）：兩者都固定在畫面右側。「下載地址」面板在 top 200px、寬 340px；附件懸浮區塊在 top 260px、寬 280px。同一篇 BT綜合區文章同時有 magnet 與附件時會疊在一起，「下載地址」面板層級較高，會蓋住附件區塊。實際遇到後再決定：其中一個往下移、改到左側，或自動錯開。兩支腳本內都有「[已知問題]」註解標示位置設定處。
+
 ---
 
 ## x1080-magnet-notion
 
 檔案：`x1080-magnet-notion.user.js`
+
+> 已知衝突：與 x1080-attachment-panel 的右側面板位置重疊，見上方「腳本之間的已知衝突」。
 
 只在「BT綜合區」（boards/7RHPO2w4jFUYiDhDsxz0wE）的文章頁顯示，提取文章內的 magnet 連結，以「下載地址」面板顯示在網頁右側。
 
@@ -99,6 +105,8 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 ## x1080-attachment-panel
 
 檔案：`x1080-attachment-panel.user.js`（Tampermonkey 內名稱：1080xin 附件區塊右側懸浮垂直版 (透明版)）
+
+> 已知衝突：與 x1080-magnet-notion 的右側面板位置重疊，見上方「腳本之間的已知衝突」。
 
 把文章內的附件區塊（`section.attachments-section`）固定在畫面右側，改成垂直排列、透明背景。網站原本的下載按鈕完整保留，只是移到最底部。
 
