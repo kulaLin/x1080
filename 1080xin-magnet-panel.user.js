@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         1080xin 磁力連結右側懸浮面板
 // @namespace    http://tampermonkey.net/
-// @version      4.0
-// @description  自動提取 1080xin.com 頁面內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
+// @version      4.1
+// @description  自動提取 1080xin.com「BT綜合區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
 // @run-at       document-idle
@@ -24,6 +24,8 @@
     if (window.top !== window.self) return;
 
     const HOST_ID = 'magnet-panel-host';
+    // 只在這個板塊（BT綜合區）內的文章顯示面板
+    const BOARD_ID = '7RHPO2w4jFUYiDhDsxz0wE';
     // btih 為 40 位 hex 或 32 位 base32；後面的參數必須以 & 開頭，避免把緊鄰的文字吃進來
     const MAGNET_RE = /magnet:\?xt=urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})(?:&[A-Za-z0-9%._~:\/?#\[\]@!$&()*+,;=-]*)?/gi;
     const NOTION_VERSION = '2022-06-28';
@@ -587,8 +589,27 @@
 
     /* ---------- 更新 ---------- */
 
+    // 文章網址為 /resources/xxx，所屬板塊由麵包屑或文章標題旁的板塊連結判斷
+    function isTargetPage() {
+        if (!/^\/resources\//.test(location.pathname)) return false;
+        const sel = `a[href*="/boards/${BOARD_ID}"]`;
+        return !!document.querySelector(`.breadcrumb ${sel}, .thread-header ${sel}`);
+    }
+
+    function removePanel() {
+        const host = document.getElementById(HOST_ID);
+        if (host) host.remove();
+        shadow = null;
+        lastKey = null;
+    }
+
     function update() {
         if (!document.body) return;
+        // 網站是單頁應用，換頁不會重新載入，所以每次內容變動都重新判斷
+        if (!isTargetPage()) {
+            removePanel();
+            return;
+        }
         const magnets = extractMagnets();
         const key = magnets.join('\n');
         if (key === lastKey && document.getElementById(HOST_ID)) return;

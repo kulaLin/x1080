@@ -1,7 +1,7 @@
 # x1080
 1080xin 磁力連結面板（Tampermonkey 腳本）
 
-自動提取 1080xin.com 頁面內的 magnet 連結，以「下載地址」面板顯示在網頁右側，可複製或一鍵傳送到 Notion 頁面。
+自動提取 1080xin.com「BT綜合區」（boards/7RHPO2w4jFUYiDhDsxz0wE）文章內的 magnet 連結，以「下載地址」面板顯示在網頁右側；其他頁面不顯示，可複製或一鍵傳送到 Notion 頁面。
 
 ## 安裝
 
