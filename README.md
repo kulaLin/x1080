@@ -8,6 +8,7 @@
 | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
 | [x1080-clean-layout](#x1080-clean-layout) | 版面精簡：隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
+| [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
 
@@ -91,3 +92,29 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 | 一樓（主文）以外的所有樓層與「還沒有回覆」 | `.post-list > *:nth-child(n+2)` |
 
 另外縮小 `.thread-header` 的間距，讓主文往上貼齊。網站改版、class 名稱變動時，對照上表修改即可。
+
+---
+
+## x1080-attachment-panel
+
+檔案：`x1080-attachment-panel.user.js`（Tampermonkey 內名稱：1080xin 附件區塊右側懸浮垂直版 (透明版)）
+
+把文章內的附件區塊（`section.attachments-section`）固定在畫面右側，改成垂直排列、透明背景。網站原本的下載按鈕完整保留，只是移到最底部。
+
+### 功能
+
+- 附件區塊懸浮在畫面右側（寬 280px），內容過長時可在區塊內捲動
+- 所有內層容器改為單欄垂直排列，檔名完整橫向顯示，不會被擠成直條
+- 「按次數下載／下載」按鈕移到區塊最底部並填滿整行
+- 隱藏「各身份價格」按鈕、「下載說明」連結與 RAR 圖示
+- 網站動態載入或換頁時自動重新套用
+
+### 設定（腳本開頭的常數）
+
+| 常數 | 預設 | 說明 |
+|---|---|---|
+| `TOP_OFFSET` | `'260px'` | 懸浮區塊距離畫面頂端的高度，數字越大越往下 |
+| `BG_OPACITY` | `0` | 背景不透明度：`0` = 完全透明，`0.2` = 微透黑底 |
+| `BLUR_PX` | `'8px'` | 毛玻璃模糊程度：`'0px'` = 不模糊，`'8px'` = 微毛玻璃 |
+
+> 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
