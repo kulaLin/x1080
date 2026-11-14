@@ -6,6 +6,7 @@
 | 腳本 | 說明 | 安裝 |
 |---|---|---|
 | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
+| [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
 
@@ -38,3 +39,30 @@
 token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中。
 
 每次傳送會在主頁面底部新增：帖子標題（連回原帖）＋時間，以及每條新的 magnet 各一個程式碼區塊（名稱在區塊說明）；子頁面則只新增 magnet 本身。
+
+---
+
+## x1080-attachment-extract
+
+檔案：`x1080-attachment-extract.user.js`（Tampermonkey 內名稱：附件下載連結一鍵提取器 (1080xin 專用版)）
+
+頁面上有「按次數下載」按鈕時，右下角出現「⚡ 一鍵提取下載連結 (N)」按鈕。
+
+### 功能
+
+- 一鍵依序點擊頁面上所有「按次數下載」按鈕（每個間隔 1.5 秒）
+- 攔截網站的下載 API 回應，取得真實下載網址與 Download Token，顯示在右下角面板（預設收合成「🎯 已攔截 N 筆」小按鈕），可一鍵複製全部
+- 每個附件都拿到 Download Token 後自動關閉分頁；倒數期間再按一次按鈕可取消關閉
+- 超過 20 秒仍有附件沒完成，就不自動關閉，並顯示完成幾個
+
+### 設定（腳本開頭的常數）
+
+| 常數 | 預設 | 說明 |
+|---|---|---|
+| `BLOCK_AUTO_DOWNLOAD` | `false` | `true` = 只抓網址、不讓瀏覽器下載 |
+| `SHOW_PANEL_BY_DEFAULT` | `false` | 攔截面板是否預設展開 |
+| `AUTO_CLOSE_TAB` | `true` | 完成後是否自動關閉分頁 |
+| `CLOSE_DELAY_MS` | `100` | 全部完成後等幾毫秒關閉分頁 |
+| `WAIT_TIMEOUT_MS` | `20000` | 最多等幾毫秒讓所有附件完成，超時就不關閉 |
+
+> 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
