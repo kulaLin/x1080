@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [x1080] 下載｜磁力連結面板＋Notion
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.6.0
-// @description  自動提取 1080xin.com「BT綜合區」與「LTX無碼破解BT區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
+// @version      4.7.0
+// @description  自動提取 1080xin.com「BT綜合區」與「LTX無碼破解BT區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面，附不會被複製的時間戳記）；搭配 x1080-tab-switcher 擴充功能可在送出後立刻切到下一個分頁
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
 // @run-at       document-idle
@@ -11,6 +11,7 @@
 // @grant        GM_setValue
 // @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
+// @grant        GM_notification
 // @grant        window.close
 // @connect      api.notion.com
 // @homepageURL  https://github.com/kulaLin/x1080
@@ -33,12 +34,23 @@
     // btih 為 40 位 hex 或 32 位 base32；後面的參數必須以 & 開頭，避免把緊鄰的文字吃進來
     const MAGNET_RE = /magnet:\?xt=urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})(?:&[A-Za-z0-9%._~:\/?#\[\]@!$&()*+,;=-]*)?/gi;
     const NOTION_VERSION = '2022-06-28';
+    // 留言 API 的 block_id 寫法以新版 API 文件為準，所以留言另外用新版
+    const NOTION_COMMENT_VERSION = '2026-03-11';
     const SUB_PAGE_TITLE = '純 magnet 連結';
+    const APP_NAME = '[x1080] 磁力連結面板';
 
     // ★ 送 Notion 成功後是否自動關閉分頁（true = 關閉 / false = 不關閉）
     const AUTO_CLOSE_TAB = true;
-    // ★ 送 Notion 成功後等幾毫秒再關閉分頁（5000 = 5 秒）；倒數期間可按「取消關閉」或 Esc 取消
-    const CLOSE_DELAY_MS = 5000;
+    // ★ 送 Notion 成功後等幾毫秒再關閉分頁（3000 = 3 秒）；倒數期間可按「取消關閉」或 Esc 取消
+    const CLOSE_DELAY_MS = 3000;
+    // ★ 按下 Notion 按鈕後立刻切到右邊的分頁（true = 切換 / false = 不切換）
+    //   需安裝 repo 內的 x1080-tab-switcher 擴充功能；沒裝就維持原本行為（停在本頁倒數關閉）
+    //   切走後本頁仍會在背景寫完 Notion；失敗時跳出桌面通知，點通知可回到本頁
+    const SWITCH_TO_NEXT_TAB = true;
+    // ★ 「純 magnet 連結」子頁面是否加上時間戳記（true = 加 / false = 不加）
+    //   時間戳記以 Notion「留言」掛在每批的第一條 magnet 上，複製頁面文字時不會被帶到
+    //   需在 Notion integration 的「功能」開啟「插入留言」（Insert comments），否則會略過並提示
+    const SUB_PAGE_TIMESTAMP = true;
 
     let lastKey = null;
     let collapsed = false;
@@ -151,6 +163,7 @@
         GM_deleteValue('notionPageId');
         GM_deleteValue('notionSubPage');
         GM_deleteValue('notionSentCache');
+        GM_deleteValue('timestampWarned');
         setStatus('已清除 Notion 設定');
     }
 
@@ -167,14 +180,14 @@
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-    function notionRequestOnce(token, method, path, body) {
+    function notionRequestOnce(token, method, path, body, version) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method,
                 url: 'https://api.notion.com' + path,
                 headers: {
                     'Authorization': 'Bearer ' + token,
-                    'Notion-Version': NOTION_VERSION,
+                    'Notion-Version': version || NOTION_VERSION,
                     'Content-Type': 'application/json'
                 },
                 data: body ? JSON.stringify(body) : undefined,
@@ -199,10 +212,10 @@
     }
 
     // 遇到 Notion 限流（429）時自動等待後重試
-    async function notionRequest(token, method, path, body) {
+    async function notionRequest(token, method, path, body, version) {
         for (let attempt = 0; ; attempt++) {
             try {
-                return await notionRequestOnce(token, method, path, body);
+                return await notionRequestOnce(token, method, path, body, version);
             } catch (e) {
                 if (e.status === 429 && attempt < 3) {
                     await sleep((e.retryAfter || 1) * 1000);
@@ -233,12 +246,30 @@
         return all;
     }
 
+    // 回傳新建立的區塊（用來在第一條 magnet 上掛時間戳記留言）
     async function appendBlocks(token, blockId, blocks) {
+        const created = [];
         // API 每次最多 100 個區塊
         for (let i = 0; i < blocks.length; i += 100) {
-            await notionRequest(token, 'PATCH', `/v1/blocks/${blockId}/children`, {
+            const res = await notionRequest(token, 'PATCH', `/v1/blocks/${blockId}/children`, {
                 children: blocks.slice(i, i + 100)
             });
+            if (res && Array.isArray(res.results)) created.push(...res.results);
+        }
+        return created;
+    }
+
+    /* 時間戳記：以留言掛在區塊上。留言不屬於頁面文字，選取複製「純 magnet 連結」時不會被帶到 */
+    async function addTimestampComment(token, blockId, stamp, count) {
+        const content = '🕒 ' + stamp + (count > 1 ? `（本次 ${count} 條）` : '');
+        try {
+            await notionRequest(token, 'POST', '/v1/comments', {
+                parent: { block_id: blockId },
+                rich_text: [{ type: 'text', text: { content } }]
+            }, NOTION_COMMENT_VERSION);
+        } catch (e) {
+            if (e.status === 403) throw new Error('時間戳記未加入：integration 尚未開啟「插入留言」權限');
+            throw new Error('時間戳記未加入：' + e.message);
         }
     }
 
@@ -296,8 +327,7 @@
         return out;
     }
 
-    function buildBlocks(magnets) {
-        const now = new Date().toLocaleString('zh-TW', { hour12: false });
+    function buildBlocks(magnets, now) {
         const header = {
             object: 'block',
             type: 'paragraph',
@@ -346,21 +376,23 @@
         return c && c.pageId === pageId ? c.subId : '';
     }
 
+    // 回傳子頁面新建立的區塊
     async function appendToSub(cfg, subId, magnets) {
         const blocks = magnets.map(plainMagnetBlock);
         try {
-            await appendBlocks(cfg.token, subId, blocks);
+            return await appendBlocks(cfg.token, subId, blocks);
         } catch (e) {
             if (e.status !== 404) throw e;
             // 子頁面被刪除或搬走：重新尋找或建立後再寫一次
             GM_deleteValue('notionSubPage');
             const mainChildren = await listChildren(cfg.token, cfg.pageId);
             const newSubId = await findOrCreateSubPage(cfg, mainChildren);
-            await appendBlocks(cfg.token, newSubId, blocks);
+            return await appendBlocks(cfg.token, newSubId, blocks);
         }
     }
 
     // 傳送：已送過的 magnet（同 hash）一律略過；主頁面與子頁面同時寫入
+    // 回傳的 note 是不影響傳送結果的附註（例如時間戳記沒加上）
     async function doSend(cfg, magnets) {
         let sent = getSentCache(cfg.pageId);
         let subId = getCachedSubId(cfg.pageId);
@@ -376,10 +408,12 @@
         }
 
         const fresh = magnets.filter(m => !sent.has(hashOf(m)));
-        if (!fresh.length) return { added: 0, skipped: magnets.length };
+        if (!fresh.length) return { added: 0, skipped: magnets.length, note: '' };
 
+        // 主頁面標題列與子頁面時間戳記用同一個時間
+        const stamp = new Date().toLocaleString('zh-TW', { hour12: false });
         const [mainRes, subRes] = await Promise.allSettled([
-            appendBlocks(cfg.token, cfg.pageId, buildBlocks(fresh)),
+            appendBlocks(cfg.token, cfg.pageId, buildBlocks(fresh, stamp)),
             appendToSub(cfg, subId, fresh)
         ]);
         if (mainRes.status === 'rejected') throw mainRes.reason;
@@ -390,27 +424,51 @@
         if (subRes.status === 'rejected') {
             throw new Error('主頁面已寫入，子頁面失敗：' + subRes.reason.message + '（可按「整理 Notion」補齊）');
         }
-        return { added: fresh.length, skipped: magnets.length - fresh.length };
+
+        // 時間戳記失敗不算傳送失敗，只附註原因
+        let note = '';
+        const first = subRes.value[0];
+        if (SUB_PAGE_TIMESTAMP && first) {
+            try {
+                await addTimestampComment(cfg.token, first.id, stamp, fresh.length);
+            } catch (e) {
+                note = e.message;
+            }
+        }
+        return { added: fresh.length, skipped: magnets.length - fresh.length, note };
     }
 
     function sendToNotion(magnets, btn) {
         const cfg = getNotionConfig();
         if (!cfg) return;
 
+        // 設定已確認（不會再跳輸入框）才切走，本頁留在背景繼續寫入
+        if (SWITCH_TO_NEXT_TAB) requestTab('next');
+
         const oldText = btn.textContent;
         btn.disabled = true;
         btn.textContent = '傳送中…';
         return enqueue(async () => {
             try {
-                const { added, skipped } = await doSend(cfg, magnets);
+                const { added, skipped, note } = await doSend(cfg, magnets);
                 btn.textContent = added ? '已傳送 ✓' : '已存在';
+                if (note) {
+                    // 時間戳記的問題只提醒一次，成功加上後才會再提醒
+                    if (!GM_getValue('timestampWarned', false)) {
+                        GM_setValue('timestampWarned', true);
+                        notifyIfAway(note + '（連結已正常送出）');
+                    }
+                } else if (added) {
+                    GM_deleteValue('timestampWarned');
+                }
                 // 確認 Notion 寫入成功後倒數關閉分頁（失敗時保留分頁）
-                scheduleClose(added
+                scheduleClose((added
                     ? `已新增 ${added} 條到 Notion` + (skipped ? `，略過重複 ${skipped} 條` : '')
-                    : 'Notion 已有這些連結');
+                    : 'Notion 已有這些連結') + (note ? `（${note}）` : ''));
             } catch (e) {
                 btn.textContent = '失敗';
                 setStatus('傳送失敗：' + e.message, true);
+                notifyIfAway('傳送 Notion 失敗：' + e.message);
             } finally {
                 btn.disabled = false;
                 setTimeout(() => { btn.textContent = oldText; }, 2000);
@@ -486,6 +544,31 @@
             } finally {
                 if (btn) btn.disabled = false;
             }
+        });
+    }
+
+    /* ---------- 分頁切換（需 x1080-tab-switcher 擴充功能） ---------- */
+
+    // 油猴腳本本身無法切換分頁；擴充功能裝好後會在 <html> 加上這個屬性，
+    // 腳本發出 DOM 事件，由擴充功能代為切換（兩者共用 DOM，事件不帶資料以免跨環境讀不到）
+    function hasTabSwitcher() {
+        return document.documentElement.hasAttribute('data-x1080-tab-switcher');
+    }
+
+    // action：'next' = 切到右邊的分頁；'focus' = 回到本分頁
+    function requestTab(action) {
+        if (!hasTabSwitcher()) return false;
+        document.dispatchEvent(new CustomEvent('x1080-tab-switcher:' + action));
+        return true;
+    }
+
+    // 已切到其他分頁時，用桌面通知告知結果；點通知回到本分頁
+    function notifyIfAway(text) {
+        if (!document.hidden) return;
+        GM_notification({
+            title: APP_NAME,
+            text: text + '\n點此回到該分頁',
+            onclick: () => { if (!requestTab('focus')) window.focus(); }
         });
     }
 

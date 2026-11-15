@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "x1080 分頁切換",
+  "version": "1.0",
+  "description": "讓 [x1080] 油猴腳本切換分頁：按下「送 Notion」後立刻跳到右邊的分頁，傳送失敗時可點通知回到原分頁。",
+  "homepage_url": "https://github.com/kulaLin/x1080",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.1080xin.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

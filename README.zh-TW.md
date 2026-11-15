@@ -16,7 +16,7 @@
 
 | Tampermonkey 名稱 | 檔案 | 說明 | 安裝 |
 |---|---|---|---|
-| [x1080] 下載｜磁力連結面板＋Notion | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區、LTX無碼破解BT區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
+| [x1080] 下載｜磁力連結面板＋Notion | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區、LTX無碼破解BT區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion（子頁面附時間戳記）後自動關閉分頁；搭配擴充功能可立刻切到下一個分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
 | [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區） | [x1080-clean-layout](#x1080-clean-layout) | 隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
@@ -24,6 +24,14 @@
 | [x1080] 瀏覽｜板塊新文章通知 | [x1080-board-watch](#x1080-board-watch) | 定時檢查關注的板塊，有新文章就用 Telegram 與桌面通知提醒 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js) |
 
 安裝方式：瀏覽器先裝好 [Tampermonkey](https://www.tampermonkey.net/)，再點上表的「安裝」連結。之後 repo 有新版時，Tampermonkey 會自動更新。
+
+### Chrome 擴充功能
+
+| 名稱 | 資料夾 | 說明 |
+|---|---|---|
+| x1080 分頁切換 | [x1080-tab-switcher](#x1080-tab-switcher) | 替油猴腳本切換分頁（油猴本身做不到）；目前供 x1080-magnet-notion 按下 Notion 後跳到下一個分頁 |
+
+擴充功能要手動載入，也不會自動更新，安裝與更新方式見該段落。
 
 ### 命名與版本規範
 
@@ -62,8 +70,10 @@
 - 抓取頁面中所有 magnet 連結（`<a>` 連結、程式碼區塊、內文純文字），同一個 hash 自動去重
 - 每條連結可「複製」或「送 Notion」；標題列可「全部複製」/「全部送 Notion」
 - 傳送到 Notion 時自動略過已送過的連結（以 btih hash 比對，使用本機快取，不必每次讀取整個 Notion 頁面）
-- 按下 Notion 按鈕、確認寫入成功後倒數 5 秒關閉分頁；倒數期間可按「取消關閉」或 Esc 取消；傳送失敗則保留分頁並顯示原因
+- 按下 Notion 按鈕、確認寫入成功後倒數 3 秒關閉分頁；倒數期間可按「取消關閉」或 Esc 取消；傳送失敗則保留分頁並顯示原因
+- 已安裝 [x1080-tab-switcher](#x1080-tab-switcher) 擴充功能時，按下 Notion 按鈕會立刻切到右邊的分頁，本頁在背景寫完 Notion 後照上述規則關閉；切走後若傳送失敗，會跳出桌面通知，點通知回到該分頁。沒裝擴充功能則維持原本行為
 - 同步寫入主頁面底下的「純 magnet 連結」子頁面（只有 magnet，一條一行；子頁面不存在會自動建立）
+- 子頁面時間戳記：每批的第一條 magnet 會掛上一則留言，例如「🕒 2026/11/16 04:04:12（本次 2 條）」。留言不屬於頁面文字，整頁選取複製時不會被帶到；時間與主頁面標題列相同
 - 面板底部「整理 Notion」：刪除主頁面與子頁面中重複的連結（整組重複時連同標題列一起刪），把子頁面缺少的補上，並以 Notion 實際內容重建本機快取（在 Notion 手動刪掉的連結，整理後可以再次傳送）
 - 點標題列可收合面板
 - 網站換頁不重新載入時也會自動更新
@@ -73,7 +83,9 @@
 | 常數 | 預設 | 說明 |
 |---|---|---|
 | `AUTO_CLOSE_TAB` | `true` | 送 Notion 成功後是否自動關閉分頁 |
-| `CLOSE_DELAY_MS` | `5000` | 成功後等幾毫秒再關閉（倒數期間可取消） |
+| `CLOSE_DELAY_MS` | `3000` | 成功後等幾毫秒再關閉（倒數期間可取消） |
+| `SWITCH_TO_NEXT_TAB` | `true` | 按下 Notion 按鈕後立刻切到右邊的分頁（需安裝 x1080-tab-switcher） |
+| `SUB_PAGE_TIMESTAMP` | `true` | 「純 magnet 連結」子頁面是否加上時間戳記留言 |
 
 > 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
 
@@ -81,12 +93,45 @@
 
 1. 到 <https://www.notion.so/profile/integrations> 建立 Internal integration，複製 token（`ntn_` 開頭）
 2. 在 integration 的「內容存取權限」勾選要寫入的 Notion 頁面（或在該頁面「⋯ → 連線」加入該 integration）
-3. 第一次按「送 Notion」時依提示貼上 token 和頁面網址；之後可從 Tampermonkey 選單「設定 Notion」修改
-4. Tampermonkey 詢問是否允許連線到 `api.notion.com` 時選「總是允許」
+3. 在 integration 的 Capabilities（功能）開啟 **Insert comments**（插入留言），子頁面的時間戳記要靠這個權限，預設是關閉的。沒開的話連結照樣送出，只是不加時間戳記，並提示一次
+4. 第一次按「送 Notion」時依提示貼上 token 和頁面網址；之後可從 Tampermonkey 選單「設定 Notion」修改
+5. Tampermonkey 詢問是否允許連線到 `api.notion.com` 時選「總是允許」
 
 token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中。
 
-每次傳送會在主頁面底部新增：帖子標題（連回原帖）＋時間，以及每條新的 magnet 各一個程式碼區塊（名稱在區塊說明）；子頁面則只新增 magnet 本身。
+每次傳送會在主頁面底部新增：帖子標題（連回原帖）＋時間，以及每條新的 magnet 各一個程式碼區塊（名稱在區塊說明）；子頁面則只新增 magnet 本身，時間戳記以留言掛在每批第一條上。「整理 Notion」補進子頁面的連結不加時間戳記。
+
+---
+
+## x1080-tab-switcher
+
+資料夾：`x1080-tab-switcher/`（Chrome 擴充功能名稱：x1080 分頁切換）
+
+油猴腳本無法切換到其他分頁，由這個擴充功能代為處理：腳本在網頁上發出事件，擴充功能收到後切換分頁。只在 1080xin.com 上執行，只切換分頁，不讀取網址、標題或網頁內容，也不連網。
+
+### 功能
+
+- x1080-magnet-notion 按下 Notion 按鈕時，切到同一視窗中右邊的分頁（已經是最右邊就不動）
+- 點擊「傳送失敗」桌面通知時，回到原分頁並把視窗帶到最前面
+
+### 安裝
+
+1. 下載此 repo（「Code → Download ZIP」解壓縮，或 git clone），把 `x1080-tab-switcher` 資料夾放在固定位置，之後不要移動或刪除
+2. Chrome 開啟 `chrome://extensions`，打開右上角「開發人員模式」
+3. 按「載入未封裝項目」，選擇 `x1080-tab-switcher` 資料夾
+4. 重新整理已開著的 1080xin 分頁（擴充功能只套用到之後載入的頁面）
+
+### 更新
+
+擴充功能不會自動更新。repo 有新版時，用新檔案覆蓋資料夾內容，到 `chrome://extensions` 按該擴充功能的重新載入按鈕，再重新整理已開著的 1080xin 分頁。
+
+### 運作方式
+
+- 載入時在網頁 `<html>` 加上 `data-x1080-tab-switcher` 屬性，油猴腳本看到這個屬性才會要求切換；沒裝就維持原本行為
+- 油猴腳本發出 `x1080-tab-switcher:next`（切到右邊分頁）或 `x1080-tab-switcher:focus`（回到本分頁）DOM 事件，內容腳本轉給背景程式處理
+- 只在發出要求的分頁仍是目前分頁時才切換，避免已經手動切走後又被帶到別處
+
+> 注意：需保持開發人員模式開啟。若電腦的 Chrome 政策封鎖開發人員模式或未封裝擴充功能（常見於公司電腦），就無法安裝。
 
 ---
 

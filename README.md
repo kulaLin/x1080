@@ -18,7 +18,7 @@ Tampermonkey userscripts for 1080xin (x1080x).
 
 | Tampermonkey name | File | Description | Install |
 |---|---|---|---|
-| [x1080] 下載｜磁力連結面板＋Notion<br>(Download · Magnet panel + Notion) | [x1080-magnet-notion](#x1080-magnet-notion) | Right-side "download links" panel on posts in BT綜合區 (BT board) and LTX無碼破解BT區 (LTX BT board): copy magnet links, send them to Notion in one click, then auto-close the tab | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
+| [x1080] 下載｜磁力連結面板＋Notion<br>(Download · Magnet panel + Notion) | [x1080-magnet-notion](#x1080-magnet-notion) | Right-side "download links" panel on posts in BT綜合區 (BT board) and LTX無碼破解BT區 (LTX BT board): copy magnet links, send them to Notion in one click (with timestamps on the sub-page), then auto-close the tab; with the companion extension it jumps to the next tab right away | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取<br>(Download · One-click attachment link extractor) | [x1080-attachment-extract](#x1080-attachment-extract) | Clicks every "download by count" attachment button, intercepts the real download URLs and tokens, then auto-closes the tab | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
 | [x1080] 版面｜附件區塊右側懸浮<br>(Layout · Floating attachment panel) | [x1080-attachment-panel](#x1080-attachment-panel) | Turns the attachment section into a floating, vertical, transparent panel on the right, with the download button at the bottom | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區）<br>(Layout · Clean-up: hide stats / signature / replies) | [x1080-clean-layout](#x1080-clean-layout) | Hides the stats under the title, signature ads, the action bar and the reply area | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
@@ -26,6 +26,14 @@ Tampermonkey userscripts for 1080xin (x1080x).
 | [x1080] 瀏覽｜板塊新文章通知<br>(Browse · New-post notifier for boards) | [x1080-board-watch](#x1080-board-watch) | Checks watched boards on a schedule and notifies new posts via Telegram and desktop notifications | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js) |
 
 How to install: install [Tampermonkey](https://www.tampermonkey.net/) in your browser first, then click an "Install" link above. Tampermonkey updates the scripts automatically when a new version is pushed to this repo.
+
+### Chrome extension
+
+| Name | Folder | Description |
+|---|---|---|
+| x1080 分頁切換<br>(x1080 tab switcher) | [x1080-tab-switcher](#x1080-tab-switcher) | Switches tabs on behalf of the userscripts (Tampermonkey cannot); currently lets x1080-magnet-notion jump to the next tab after "Send to Notion" |
+
+The extension is loaded by hand and does not update automatically — see its section for install and update steps.
 
 ### Naming and versioning rules
 
@@ -64,8 +72,10 @@ Shown only on posts in BT綜合區 (BT board, `boards/7RHPO2w4jFUYiDhDsxz0wE`) a
 - Finds every magnet link on the page (`<a>` links, code blocks, plain text in the post); duplicates with the same hash are merged
 - Each link has 「複製」 (Copy) and 「Notion」 (send to Notion) buttons; the header has 「全部複製」 (Copy all) and 「全部送 Notion」 (Send all to Notion)
 - Links already sent to Notion are skipped automatically (matched by btih hash using a local cache, so the Notion page does not need to be read every time)
-- After a successful send, the tab closes after a 5-second countdown; press 「取消關閉」 (Cancel close) or Esc to keep it open. If the send fails, the tab stays open and shows the reason
+- After a successful send, the tab closes after a 3-second countdown; press 「取消關閉」 (Cancel close) or Esc to keep it open. If the send fails, the tab stays open and shows the reason
+- With the [x1080-tab-switcher](#x1080-tab-switcher) extension installed, pressing a Notion button switches to the tab on the right immediately; this tab finishes writing to Notion in the background and then closes as above. If the send fails after you have switched away, a desktop notification appears — click it to return to that tab. Without the extension, behaviour is unchanged
 - Also writes to the 「純 magnet 連結」 (plain magnet links) sub-page under the main page — magnets only, one per line; the sub-page is created if missing
+- Sub-page timestamps: the first magnet of each batch gets a comment such as 「🕒 2026/11/16 04:04:12（本次 2 條）」 (time, plus how many links were in the batch). Comments are not part of the page text, so they are not included when you select and copy the page; the time matches the main page's header line
 - 「整理 Notion」 (Tidy Notion) at the bottom of the panel: removes duplicate links on the main page and the sub-page (a whole group's header line is removed too when all its links are duplicates), fills in links missing from the sub-page, and rebuilds the local cache from Notion (links deleted by hand in Notion can be sent again afterwards)
 - Click the header to collapse the panel
 - Keeps working when the site changes pages without a full reload
@@ -75,7 +85,9 @@ Shown only on posts in BT綜合區 (BT board, `boards/7RHPO2w4jFUYiDhDsxz0wE`) a
 | Constant | Default | Description |
 |---|---|---|
 | `AUTO_CLOSE_TAB` | `true` | Close the tab after a successful send to Notion |
-| `CLOSE_DELAY_MS` | `5000` | Milliseconds to wait before closing (can be cancelled during the countdown) |
+| `CLOSE_DELAY_MS` | `3000` | Milliseconds to wait before closing (can be cancelled during the countdown) |
+| `SWITCH_TO_NEXT_TAB` | `true` | Switch to the tab on the right as soon as a Notion button is pressed (needs x1080-tab-switcher) |
+| `SUB_PAGE_TIMESTAMP` | `true` | Add timestamp comments to the 「純 magnet 連結」 sub-page |
 
 > Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
 
@@ -83,12 +95,45 @@ Shown only on posts in BT綜合區 (BT board, `boards/7RHPO2w4jFUYiDhDsxz0wE`) a
 
 1. Create an Internal integration at <https://www.notion.so/profile/integrations> and copy its token (starts with `ntn_`)
 2. In the integration's "Content access" tab, grant access to the Notion page to write to (or add the integration via the page's "⋯ → Connections")
-3. The first time you press "Send to Notion", paste the token and the page URL when prompted; change them later from the Tampermonkey menu 「設定 Notion」 (Set up Notion)
-4. When Tampermonkey asks whether to allow connecting to `api.notion.com`, choose "Always allow"
+3. In the integration's Capabilities, turn on **Insert comments** — the sub-page timestamps need it, and it is off by default. Without it, links are still sent, just without timestamps, and you are told once
+4. The first time you press "Send to Notion", paste the token and the page URL when prompted; change them later from the Tampermonkey menu 「設定 Notion」 (Set up Notion)
+5. When Tampermonkey asks whether to allow connecting to `api.notion.com`, choose "Always allow"
 
 The token is stored only in Tampermonkey's local storage in your browser, never in this repo.
 
-Each send appends to the bottom of the main page: the post title (linking back to the post) with a timestamp, then one code block per new magnet (name in the block caption). The sub-page only gets the magnet links themselves.
+Each send appends to the bottom of the main page: the post title (linking back to the post) with a timestamp, then one code block per new magnet (name in the block caption). The sub-page only gets the magnet links themselves, with the timestamp attached as a comment on the first link of each batch. Links that 「整理 Notion」 (Tidy Notion) fills into the sub-page get no timestamp.
+
+---
+
+## x1080-tab-switcher
+
+Folder: `x1080-tab-switcher/` (Chrome extension name: x1080 分頁切換 / x1080 tab switcher)
+
+Userscripts cannot switch to another tab, so this extension does it for them: the script fires an event on the page and the extension switches tabs. It runs only on 1080xin.com, only switches tabs, and does not read URLs, titles or page content or make any network requests.
+
+### Features
+
+- When a Notion button is pressed in x1080-magnet-notion, switches to the tab on the right in the same window (does nothing if it is already the rightmost tab)
+- When the "send failed" desktop notification is clicked, returns to the original tab and brings its window to the front
+
+### Install
+
+1. Download this repo ("Code → Download ZIP" and unzip, or git clone) and keep the `x1080-tab-switcher` folder somewhere permanent — do not move or delete it afterwards
+2. Open `chrome://extensions` in Chrome and turn on "Developer mode" (top right)
+3. Click "Load unpacked" and choose the `x1080-tab-switcher` folder
+4. Reload any 1080xin tabs that are already open (the extension only applies to pages loaded after it is installed)
+
+### Update
+
+The extension does not update automatically. When the repo has a new version, overwrite the folder's files, press the extension's reload button in `chrome://extensions`, then reload any open 1080xin tabs.
+
+### How it works
+
+- On load it adds a `data-x1080-tab-switcher` attribute to the page's `<html>`; the userscript only asks to switch tabs when it sees this attribute, otherwise it behaves as before
+- The userscript fires an `x1080-tab-switcher:next` (switch to the tab on the right) or `x1080-tab-switcher:focus` (return to this tab) DOM event; the content script passes it to the background script
+- It only switches when the requesting tab is still the active tab, so you are not pulled away after switching tabs yourself
+
+> Note: Developer mode must stay on. If the computer's Chrome policy blocks Developer mode or unpacked extensions (common on work computers), it cannot be installed.
 
 ---
 
