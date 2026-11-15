@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 瀏覽｜板塊新文章通知
 // @namespace    https://github.com/kulaLin/x1080
-// @version      1.0.1
+// @version      1.0.2
 // @description  定時檢查關注的 1080xin 板塊，有新文章就用 Telegram 與桌面通知提醒；需保留一個 1080xin 分頁開著（建議釘選）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -31,7 +31,7 @@
         { name: '高清有碼', url: '/boards/2SeUSjSuXYiPAfTkWMNc9T' },
         { name: '外挂字幕', url: '/boards/0YB5HUwgTlLJnll5PR3Sxz' },
         { name: '亞洲SM', url: '/boards/5Vq0rCx89xT1rMiJ6ZAw42' },
-        { name: 'BT綜合區（無碼HD）', url: '/boards/7RHPO2w4jFUYiDhDsxz0wE?category_id=2lrSOyEwyacrCPS2aN7ZM6' },
+        { name: 'LTX無碼破解BT區', url: '/boards/1xkjWeK81SqdZnAwF0lg35' },
     ];
     // ★ 幾分鐘檢查一次（建議 10 以上，對網站比較友善）
     const CHECK_INTERVAL_MIN = 10;

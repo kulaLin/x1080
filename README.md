@@ -243,7 +243,7 @@ Check now, show monitor status, pause/resume monitoring, set up Telegram, test T
 
 | Constant | Default | Description |
 |---|---|---|
-| `BOARDS` | 高清有碼 (HD censored), 外挂字幕 (external subtitles), 亞洲SM (Asian SM), BT綜合區（無碼HD） (BT board, uncensored HD category) | Names and URLs of the watched boards; a `category_id` filter may be included |
+| `BOARDS` | 高清有碼 (HD censored), 外挂字幕 (external subtitles), 亞洲SM (Asian SM), LTX無碼破解BT區 (LTX uncensored-leak BT board) | Names and URLs of the watched boards; a `category_id` filter may be included |
 | `CHECK_INTERVAL_MIN` | `10` | Minutes between checks |
 | `NOTIFY_TELEGRAM` | `true` | Notify via Telegram |
 | `NOTIFY_DESKTOP` | `true` | Notify via desktop notifications |

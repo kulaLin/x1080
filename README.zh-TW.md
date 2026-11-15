@@ -241,7 +241,7 @@ Telegram token 與 chat id 只存在本機 Tampermonkey 中，不在此 repo。
 
 | 常數 | 預設 | 說明 |
 |---|---|---|
-| `BOARDS` | 高清有碼、外挂字幕、亞洲SM、BT綜合區（無碼HD） | 關注的板塊名稱與網址，可帶 `category_id` 篩選分類 |
+| `BOARDS` | 高清有碼、外挂字幕、亞洲SM、LTX無碼破解BT區 | 關注的板塊名稱與網址，可帶 `category_id` 篩選分類 |
 | `CHECK_INTERVAL_MIN` | `10` | 幾分鐘檢查一次 |
 | `NOTIFY_TELEGRAM` | `true` | 是否用 Telegram 通知 |
 | `NOTIFY_DESKTOP` | `true` | 是否用桌面通知 |
