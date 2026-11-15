@@ -1,6 +1,14 @@
 # x1080
 1080xin（x1080x）相關 Tampermonkey 腳本
 
+![Tampermonkey](https://img.shields.io/badge/Tampermonkey-userscript-00485B?logo=tampermonkey&logoColor=white)
+![scripts](https://img.shields.io/badge/scripts-6-blue)
+![browser](https://img.shields.io/badge/browser-Chrome-4285F4?logo=googlechrome&logoColor=white)
+![Notion](https://img.shields.io/badge/Notion-API-000000?logo=notion&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram&logoColor=white)
+![i18n](https://img.shields.io/badge/i18n-繁體中文-orange)
+![last commit](https://img.shields.io/github/last-commit/kulaLin/x1080)
+
 ## 腳本列表
 
 | Tampermonkey 名稱 | 檔案 | 說明 | 安裝 |
@@ -26,6 +34,7 @@
 | `@namespace` | 固定 `https://github.com/kulaLin/x1080` | |
 | 版本號 | 主版.次版.修正：修 bug → 第三碼 +1；加功能或改名稱等外觀資訊 → 第二碼 +1；大改 → 第一碼 +1；只改註解不升版 | 4.4 → 4.4.1 / 4.5 / 5.0 |
 | 已知問題 | 程式碼內用 `// [已知問題] YYYY-MM-DD` 註解，README 對應段落同步記錄 | |
+| README 徽章 | 新增或移除腳本時，更新最上方 `scripts-N` 徽章的數字 | `scripts-6` → `scripts-7` |
 | 設定值 | 放在腳本開頭的常數或 `CONFIG`，要改請改 repo 檔案（在 Tampermonkey 編輯器改會被自動更新覆蓋） | |
 
 > Tampermonkey 用「`@name` + `@namespace`」辨認同一支腳本。這兩個值一改，就會被當成新腳本，原本存在腳本裡的資料（Notion token、已開記錄等）不會帶過去，改之前要先備份。
