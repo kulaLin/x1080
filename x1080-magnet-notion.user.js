@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [x1080] 下載｜磁力連結面板＋Notion
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.5.1
-// @description  自動提取 1080xin.com「BT綜合區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
+// @version      4.6.0
+// @description  自動提取 1080xin.com「BT綜合區」與「LTX無碼破解BT區」文章內的 magnet 連結，以「下載地址」面板顯示於網頁右側，可一鍵傳送到 Notion（自動略過重複，並同步「純 magnet 連結」子頁面）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
 // @run-at       document-idle
@@ -25,8 +25,11 @@
     if (window.top !== window.self) return;
 
     const HOST_ID = 'magnet-panel-host';
-    // 只在這個板塊（BT綜合區）內的文章顯示面板
-    const BOARD_ID = '7RHPO2w4jFUYiDhDsxz0wE';
+    // ★ 只在這些板塊內的文章顯示面板（板塊網址 /boards/ 後面那段）
+    const BOARD_IDS = [
+        '7RHPO2w4jFUYiDhDsxz0wE', // BT綜合區
+        '1xkjWeK81SqdZnAwF0lg35', // LTX無碼破解BT區
+    ];
     // btih 為 40 位 hex 或 32 位 base32；後面的參數必須以 & 開頭，避免把緊鄰的文字吃進來
     const MAGNET_RE = /magnet:\?xt=urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})(?:&[A-Za-z0-9%._~:\/?#\[\]@!$&()*+,;=-]*)?/gi;
     const NOTION_VERSION = '2022-06-28';
@@ -703,8 +706,10 @@
     // 文章網址為 /resources/xxx，所屬板塊由麵包屑或文章標題旁的板塊連結判斷
     function isTargetPage() {
         if (!/^\/resources\//.test(location.pathname)) return false;
-        const sel = `a[href*="/boards/${BOARD_ID}"]`;
-        return !!document.querySelector(`.breadcrumb ${sel}, .thread-header ${sel}`);
+        const sel = BOARD_IDS
+            .map(id => `.breadcrumb a[href*="/boards/${id}"], .thread-header a[href*="/boards/${id}"]`)
+            .join(', ');
+        return !!document.querySelector(sel);
     }
 
     function removePanel() {

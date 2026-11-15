@@ -16,7 +16,7 @@
 
 | Tampermonkey 名稱 | 檔案 | 說明 | 安裝 |
 |---|---|---|---|
-| [x1080] 下載｜磁力連結面板＋Notion | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
+| [x1080] 下載｜磁力連結面板＋Notion | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區、LTX無碼破解BT區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion 後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
 | [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區） | [x1080-clean-layout](#x1080-clean-layout) | 隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
@@ -45,7 +45,7 @@
 
 ### 腳本之間的已知衝突（待確認）
 
-- **x1080-magnet-notion 與 x1080-attachment-panel 位置重疊**（2026-11-15 記錄）：兩者都固定在畫面右側。「下載地址」面板在 top 200px、寬 340px；附件懸浮區塊在 top 260px、寬 280px。同一篇 BT綜合區文章同時有 magnet 與附件時會疊在一起，「下載地址」面板層級較高，會蓋住附件區塊。實際遇到後再決定：其中一個往下移、改到左側，或自動錯開。兩支腳本內都有「[已知問題]」註解標示位置設定處。
+- **x1080-magnet-notion 與 x1080-attachment-panel 位置重疊**（2026-11-15 記錄）：兩者都固定在畫面右側。「下載地址」面板在 top 200px、寬 340px；附件懸浮區塊在 top 260px、寬 280px。同一篇文章同時有 magnet 與附件時會疊在一起，「下載地址」面板層級較高，會蓋住附件區塊。實際遇到後再決定：其中一個往下移、改到左側，或自動錯開。兩支腳本內都有「[已知問題]」註解標示位置設定處。
 
 ---
 
@@ -55,7 +55,7 @@
 
 > 已知衝突：與 x1080-attachment-panel 的右側面板位置重疊，見上方「腳本之間的已知衝突」。
 
-只在「BT綜合區」（boards/7RHPO2w4jFUYiDhDsxz0wE）的文章頁顯示，提取文章內的 magnet 連結，以「下載地址」面板顯示在網頁右側。
+只在「BT綜合區」（boards/7RHPO2w4jFUYiDhDsxz0wE）與「LTX無碼破解BT區」（boards/1xkjWeK81SqdZnAwF0lg35）的文章頁顯示（板塊清單在腳本開頭的 `BOARD_IDS`），提取文章內的 magnet 連結，以「下載地址」面板顯示在網頁右側。
 
 ### 功能
 

@@ -18,7 +18,7 @@ Tampermonkey userscripts for 1080xin (x1080x).
 
 | Tampermonkey name | File | Description | Install |
 |---|---|---|---|
-| [x1080] 下載｜磁力連結面板＋Notion<br>(Download · Magnet panel + Notion) | [x1080-magnet-notion](#x1080-magnet-notion) | Right-side "download links" panel on BT綜合區 (BT board) posts: copy magnet links, send them to Notion in one click, then auto-close the tab | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
+| [x1080] 下載｜磁力連結面板＋Notion<br>(Download · Magnet panel + Notion) | [x1080-magnet-notion](#x1080-magnet-notion) | Right-side "download links" panel on posts in BT綜合區 (BT board) and LTX無碼破解BT區 (LTX BT board): copy magnet links, send them to Notion in one click, then auto-close the tab | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取<br>(Download · One-click attachment link extractor) | [x1080-attachment-extract](#x1080-attachment-extract) | Clicks every "download by count" attachment button, intercepts the real download URLs and tokens, then auto-closes the tab | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
 | [x1080] 版面｜附件區塊右側懸浮<br>(Layout · Floating attachment panel) | [x1080-attachment-panel](#x1080-attachment-panel) | Turns the attachment section into a floating, vertical, transparent panel on the right, with the download button at the bottom | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區）<br>(Layout · Clean-up: hide stats / signature / replies) | [x1080-clean-layout](#x1080-clean-layout) | Hides the stats under the title, signature ads, the action bar and the reply area | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
@@ -47,7 +47,7 @@ Every new or changed script follows these rules.
 
 ### Known conflict between scripts (to be confirmed)
 
-- **x1080-magnet-notion and x1080-attachment-panel overlap** (recorded 2026-11-15): both are fixed to the right side of the screen. The "download links" panel sits at top 200px, width 340px; the floating attachment panel at top 260px, width 280px. On a BT綜合區 post that has both magnets and attachments they overlap, and the download-links panel (higher z-index) covers the attachment panel. To be decided once it actually happens: move one down, move one to the left, or offset them automatically. Both scripts mark the position setting with a `[已知問題]` comment.
+- **x1080-magnet-notion and x1080-attachment-panel overlap** (recorded 2026-11-15): both are fixed to the right side of the screen. The "download links" panel sits at top 200px, width 340px; the floating attachment panel at top 260px, width 280px. On a post that has both magnets and attachments they overlap, and the download-links panel (higher z-index) covers the attachment panel. To be decided once it actually happens: move one down, move one to the left, or offset them automatically. Both scripts mark the position setting with a `[已知問題]` comment.
 
 ---
 
@@ -57,7 +57,7 @@ File: `x1080-magnet-notion.user.js` (Tampermonkey name: [x1080] 下載｜磁力�
 
 > Known conflict: overlaps the right-side panel of x1080-attachment-panel — see "Known conflict between scripts" above.
 
-Shown only on posts in BT綜合區 (BT board, `boards/7RHPO2w4jFUYiDhDsxz0wE`). Extracts the magnet links in the post and shows them in a 「下載地址」 (download links) panel on the right.
+Shown only on posts in BT綜合區 (BT board, `boards/7RHPO2w4jFUYiDhDsxz0wE`) and LTX無碼破解BT區 (LTX BT board, `boards/1xkjWeK81SqdZnAwF0lg35`); the board list is `BOARD_IDS` at the top of the script. Extracts the magnet links in the post and shows them in a 「下載地址」 (download links) panel on the right.
 
 ### Features
 
