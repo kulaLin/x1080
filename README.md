@@ -260,16 +260,17 @@ The site has no RSS and no "follow board" feature, and requests without a logged
 ### How it works
 
 - Reads the watched boards every 10 minutes (3 seconds between boards)
+- When there is more than one page of new posts, it keeps reading the following pages (20 posts per page, 2 seconds between pages) until it reaches posts already seen, up to page 30, so a backlog after the computer slept or a site verification blocked it for hours is caught up in one go (since v1.1.0; earlier versions read only page 1, and the site-wide pinned posts on page 1 broke the "whole page is new" check, so large batches were under-reported)
 - Tries these read methods in order: ① the page's own fetch ② Tampermonkey's GM_xmlhttpRequest ③ loading the board in a hidden iframe. 「顯示監控狀態」 (Show monitor status) shows which one was used (v1.0 fetched directly from the script context and was blocked with 403; v1.0.1 switched to this approach)
-- The first run only records existing posts without notifying; afterwards only unseen posts are notified (pinned announcements are recorded on the first run only)
-- Notifications: Telegram (titles with clickable links) and Windows desktop notifications (click to open the post); more than 3 new posts on one board are merged into a single desktop notification
+- The first run only records existing posts without notifying; afterwards only unseen posts are notified (site-wide pinned posts never count as new)
+- Notifications: Telegram (titles with clickable links; above 30 new posts on one board only the newest 30 are listed, with a link to the board) and Windows desktop notifications (click to open the post); more than 3 new posts on one board are merged into a single desktop notification
 - With several 1080xin tabs open, only one tab does the checking, so there are no duplicate notifications
 - If reading fails (for example an expired login or a site verification) or the site layout changes, you are alerted at most once every 6 hours
 
 ### Limitations
 
 - **At least one 1080xin tab must stay open** (pinning it is recommended); nothing is checked while the computer sleeps or Chrome is closed, and the next check after resuming catches up
-- If more than a full page (about 23 posts) of new posts appears on a board between two checks, posts pushed to page 2 may be missed; the notification then says 「可能還有更多」 (there may be more)
+- If more than 30 pages (600 posts) of new posts appear on a board between two checks, only the newest 600 are notified and the notification says the page limit was reached; if a later page fails to load, that is noted too and the posts already read are still notified
 
 ### First use
 
@@ -293,6 +294,9 @@ Check now, show monitor status, pause/resume monitoring, set up Telegram, test T
 | `NOTIFY_TELEGRAM` | `true` | Notify via Telegram |
 | `NOTIFY_DESKTOP` | `true` | Notify via desktop notifications |
 | `TELEGRAM_SHOW_TITLES` | `true` | List post titles in Telegram; `false` sends only "board X has N new posts", so titles are less likely to appear on the phone's lock screen |
+| `TELEGRAM_MAX_TITLES` | `30` | Maximum titles listed per board in Telegram, with a board link for the rest; `0` = list all |
 | `GAP_BETWEEN_BOARDS_MS` | `3000` | Delay between reading each board |
+| `MAX_PAGES_PER_CHECK` | `30` | How many pages to read at most when there is more than one page of new posts |
+| `GAP_BETWEEN_PAGES_MS` | `2000` | Delay before reading the next page of the same board |
 
 > Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
