@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 瀏覽｜板塊新文章通知
 // @namespace    https://github.com/kulaLin/x1080
-// @version      1.0.2
+// @version      1.1.0
 // @description  定時檢查關注的 1080xin 板塊，有新文章就用 Telegram 與桌面通知提醒；需保留一個 1080xin 分頁開著（建議釘選）
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -40,10 +40,16 @@
     const NOTIFY_DESKTOP = true;
     // ★ Telegram 訊息是否列出文章標題（false = 只通知「某板塊有 N 篇新文章」，手機鎖定畫面比較不會露出標題）
     const TELEGRAM_SHOW_TITLES = true;
+    // ★ Telegram 每個板塊最多列出幾篇標題（0 = 全部列出）；新文章很多時只列最新的幾篇，其餘附板塊連結，避免洗版
+    const TELEGRAM_MAX_TITLES = 30;
     // ★ 每個板塊之間間隔幾毫秒再讀下一個
     const GAP_BETWEEN_BOARDS_MS = 3000;
-    // 每個板塊最多記住幾篇已看過的文章
-    const MAX_SEEN_PER_BOARD = 500;
+    // ★ 新文章超過一頁時，最多往後讀到第幾頁（每頁 20 篇；電腦睡眠、Chrome 關閉或被網站驗證擋住一段時間後才會用到）
+    const MAX_PAGES_PER_CHECK = 30;
+    // ★ 同一板塊讀下一頁之前間隔幾毫秒
+    const GAP_BETWEEN_PAGES_MS = 2000;
+    // 每個板塊最多記住幾篇已看過的文章（要大於 MAX_PAGES_PER_CHECK × 20）
+    const MAX_SEEN_PER_BOARD = 1000;
 
     // ===== 內部狀態鍵值 =====================================================
     const K_LAST_CHECK = 'lastCheckAt';
@@ -118,11 +124,11 @@
 
     const isBlocked = r => r.status !== 200 || /cf-chl|Just a moment/i.test(r.text);
 
-    async function getBoardHtml(board) {
+    async function getBoardHtml(url) {
         const tried = [];
         for (const [name, fn] of [['網頁 fetch', pageFetchText], ['GM_xmlhttpRequest', gmFetchText], ['iframe', iframeFetchText]]) {
             try {
-                const r = await fn(board.url);
+                const r = await fn(url);
                 if (!isBlocked(r)) {
                     lastMethod = name;
                     return r.text;
@@ -137,8 +143,15 @@
         throw err;
     }
 
-    async function fetchBoard(board) {
-        const html = await getBoardHtml(board);
+    // 板塊分頁網址：第 1 頁是板塊網址本身，之後加 page=N
+    function pageUrl(board, page) {
+        if (page <= 1) return board.url;
+        return board.url + (board.url.includes('?') ? '&' : '?') + 'page=' + page;
+    }
+
+    // 讀取板塊某一頁。第 1 頁最上面有全站置頂（.is-sticky，約 3 篇），之後每頁 20 篇，新的在上面
+    async function fetchPage(board, page) {
+        const html = await getBoardHtml(pageUrl(board, page));
         const doc = new DOMParser().parseFromString(html, 'text/html');
         const items = [];
         const seenIds = new Set();
@@ -153,37 +166,82 @@
                 id,
                 title: a.textContent.trim(),
                 category: cat ? cat.textContent.trim() : '',
-                url: location.origin + '/resources/' + id
+                url: location.origin + '/resources/' + id,
+                sticky: !!row.querySelector('.is-sticky')
             });
         });
-        if (!items.length) {
+        return items;
+    }
+
+    // 執行時間較長（往後讀很多頁）時延長鎖定，避免其他分頁同時開始檢查
+    function renewLock() {
+        const held = GM_getValue(K_LOCK, null);
+        if (held && held.owner === TAB_ID) GM_setValue(K_LOCK, { owner: TAB_ID, until: now() + LOCK_MS });
+    }
+
+    async function checkBoard(board) {
+        const first = await fetchPage(board, 1);
+        if (!first.length) {
             const err = new Error('讀到頁面但找不到文章列表，網站版面可能改了');
             err.needsAttention = true;
             throw err;
         }
-        return items;
-    }
-
-    async function checkBoard(board) {
-        const items = await fetchBoard(board);
         const stored = GM_getValue(seenKey(board), null);
 
         // 第一次檢查：只記錄現有文章，不通知
         if (!Array.isArray(stored)) {
-            GM_setValue(seenKey(board), items.map(i => i.id).slice(0, MAX_SEEN_PER_BOARD));
-            return { board, fresh: [], firstRun: true, total: items.length };
+            GM_setValue(seenKey(board), first.map(i => i.id).slice(0, MAX_SEEN_PER_BOARD));
+            return { board, fresh: [], firstRun: true, pages: 1 };
+        }
+
+        const seen = new Set(stored);
+        const fetched = [];     // 這次讀到的所有文章 id（含置頂），依頁面順序
+        const fresh = [];       // 新文章，新的在前
+        const freshIds = new Set();
+        const take = items => items.forEach(i => {
+            fetched.push(i.id);
+            if (i.sticky || seen.has(i.id) || freshIds.has(i.id)) return;
+            freshIds.add(i.id);
+            fresh.push(i);
+        });
+        // 這一頁最下面一篇（不算置頂）也沒看過，代表下一頁可能還有新文章
+        // 置頂文章不算：第 1 頁永遠有已看過的置頂，v1.0 因此在第 1 頁全是新文章時也不會往後讀
+        const bottomIsNew = items => {
+            const normal = items.filter(i => !i.sticky);
+            return normal.length > 0 && !seen.has(normal[normal.length - 1].id);
+        };
+
+        take(first);
+        let items = first;
+        let page = 1;
+        let capped = false;     // 讀到 MAX_PAGES_PER_CHECK 還沒接上已看過的文章
+        let pageError = '';     // 往後讀時某一頁讀取失敗
+        while (bottomIsNew(items)) {
+            if (page >= MAX_PAGES_PER_CHECK) {
+                capped = true;
+                break;
+            }
+            renewLock();
+            await sleep(GAP_BETWEEN_PAGES_MS);
+            page++;
+            try {
+                items = await fetchPage(board, page);
+            } catch (e) {
+                pageError = `第 ${page} 頁讀取失敗（${e.message}）`;
+                page--;
+                break;
+            }
+            if (!items.length) break; // 已經是最後一頁
+            take(items);
         }
 
         // 寫入前重讀一次，降低多分頁同時檢查造成重複通知
         const latest = GM_getValue(seenKey(board), stored);
-        const seen = new Set(latest);
-        const fresh = items.filter(i => !seen.has(i.id));
-        if (fresh.length) {
-            GM_setValue(seenKey(board), [...fresh.map(i => i.id), ...latest].slice(0, MAX_SEEN_PER_BOARD));
-        }
-        // 整頁都是新文章，代表兩次檢查之間可能還有更多被擠到下一頁
-        const maybeMore = fresh.length === items.length;
-        return { board, fresh, firstRun: false, total: items.length, maybeMore };
+        const latestSet = new Set(latest);
+        const notified = fresh.filter(i => !latestSet.has(i.id));
+        // 這次讀到的文章（含置頂）一律放到清單最前面：置頂文章不會因為清單滿了被擠掉而重複通知
+        GM_setValue(seenKey(board), [...new Set([...fetched, ...latest])].slice(0, MAX_SEEN_PER_BOARD));
+        return { board, fresh: notified, firstRun: false, pages: page, capped, pageError };
     }
 
     // ===== 通知 ============================================================
@@ -242,6 +300,13 @@
         });
     }
 
+    // 新文章沒有全部讀到時的說明
+    function incompleteNote(r) {
+        if (r.capped) return `已讀到第 ${r.pages} 頁上限，更早的可能還有`;
+        if (r.pageError) return `${r.pageError}，更早的可能還有`;
+        return '';
+    }
+
     async function notifyFresh(results) {
         const withNew = results.filter(r => r.fresh && r.fresh.length);
         if (!withNew.length) return;
@@ -250,12 +315,13 @@
             withNew.forEach(r => {
                 // 由舊到新（板塊列表是新的在上面）
                 const list = [...r.fresh].reverse();
-                if (list.length <= 3) {
+                const note = incompleteNote(r);
+                if (list.length <= 3 && !note) {
                     list.forEach(i => desktopNotify(`[${r.board.name}] 新文章`, i.title, i.url));
                 } else {
                     desktopNotify(
-                        `[${r.board.name}] ${list.length} 篇新文章`,
-                        list.slice(-3).map(i => i.title).join('\n') + '\n…',
+                        `[${r.board.name}] ${list.length} 篇新文章` + (r.pages > 1 ? `（${r.pages} 頁）` : ''),
+                        (note ? note + '\n' : '') + list.slice(-3).map(i => i.title).join('\n') + (list.length > 3 ? '\n…' : ''),
                         location.origin + r.board.url
                     );
                 }
@@ -266,12 +332,19 @@
             const lines = [];
             withNew.forEach(r => {
                 const list = [...r.fresh].reverse();
+                const boardLink = `<a href="${escapeHtml(location.origin + r.board.url)}">開啟板塊</a>`;
+                const note = incompleteNote(r);
                 lines.push(`<b>[${escapeHtml(r.board.name)}] ${list.length} 篇新文章</b>` +
-                    (r.maybeMore ? '（整頁都是新的，可能還有更多）' : ''));
+                    (r.pages > 1 ? `（${r.pages} 頁）` : ''));
+                if (note) lines.push('⚠️ ' + escapeHtml(note));
                 if (TELEGRAM_SHOW_TITLES) {
-                    list.forEach(i => lines.push(`• <a href="${escapeHtml(i.url)}">${escapeHtml(i.title)}</a>`));
+                    const shown = TELEGRAM_MAX_TITLES > 0 ? list.slice(-TELEGRAM_MAX_TITLES) : list;
+                    if (shown.length < list.length) {
+                        lines.push(`（只列最新 ${shown.length} 篇，另有 ${list.length - shown.length} 篇較舊的：${boardLink}）`);
+                    }
+                    shown.forEach(i => lines.push(`• <a href="${escapeHtml(i.url)}">${escapeHtml(i.title)}</a>`));
                 } else {
-                    lines.push(`<a href="${escapeHtml(location.origin + r.board.url)}">開啟板塊</a>`);
+                    lines.push(boardLink);
                 }
                 lines.push('');
             });
@@ -310,11 +383,14 @@
         try {
             for (let i = 0; i < BOARDS.length; i++) {
                 try {
-                    results.push(await checkBoard(BOARDS[i]));
+                    const r = await checkBoard(BOARDS[i]);
+                    results.push(r);
+                    if (r.pageError) errors.push(`${BOARDS[i].name}：${r.pageError}`);
                 } catch (e) {
                     errors.push(`${BOARDS[i].name}：${e.message}`);
                     if (e.needsAttention) await warnOnce(`${BOARDS[i].name}：${e.message}`);
                 }
+                renewLock();
                 if (i < BOARDS.length - 1) await sleep(GAP_BETWEEN_BOARDS_MS);
             }
             await notifyFresh(results);
@@ -325,7 +401,9 @@
                 boards: results.map(r => ({
                     name: r.board.name,
                     fresh: r.fresh.length,
-                    firstRun: r.firstRun
+                    firstRun: r.firstRun,
+                    pages: r.pages,
+                    capped: r.capped
                 })),
                 errors,
                 method: lastMethod
@@ -380,7 +458,8 @@
         ];
         if (r && r.method) lines.push(`讀取方式：${r.method}`, '');
         if (r) {
-            r.boards.forEach(b => lines.push(`${b.name}：${b.firstRun ? '首次記錄' : `新文章 ${b.fresh} 篇`}`));
+            r.boards.forEach(b => lines.push(`${b.name}：${b.firstRun ? '首次記錄' : `新文章 ${b.fresh} 篇`}` +
+                (b.pages > 1 ? `（讀了 ${b.pages} 頁${b.capped ? '，已到上限' : ''}）` : '')));
             r.errors.forEach(e => lines.push('⚠️ ' + e));
         }
         lines.push('', '提醒：需保留至少一個 1080xin 分頁開著才會檢查。');
