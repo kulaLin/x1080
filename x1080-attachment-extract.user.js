@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜附件連結一鍵提取
 // @namespace    https://github.com/kulaLin/x1080
-// @version      2.12
+// @version      2.13
 // @description  自動點擊「按次數下載」並攔截真實下載網址與 Token，完成後自動關閉分頁
 // @author       Gemini
 // @match        *://1080xin.com/*
@@ -27,8 +27,8 @@
     const CLOSE_DELAY_MS = 100;
     // 設定：最多等幾毫秒讓所有附件完成；超時代表有附件沒成功，就不自動關閉
     const WAIT_TIMEOUT_MS = 20000;
-    // 設定：一鍵提取按鈕距離畫面頂端多遠（35vh = 畫面高度的 35%，- 10px = 再往上 10 像素；數字越小越上面；攔截面板會自動跟在按鈕下方）
-    const BUTTON_TOP = 'calc(35vh - 10px)';
+    // 設定：一鍵提取按鈕距離畫面頂端多遠（35vh = 畫面高度的 35%，- 15px = 再往上 15 像素；數字越小越上面；攔截面板會自動跟在按鈕下方）
+    const BUTTON_TOP = 'calc(35vh - 15px)';
     // 攔截面板 / 收合小按鈕的位置 = 一鍵提取按鈕下方 60px（固定換算，不用改）
     const PANEL_TOP = `calc(${BUTTON_TOP} + 60px)`;
     // 設定：液態玻璃的深淺（'auto' = 跟著系統的淺色 / 深色模式；'light' = 永遠淺色玻璃；'dark' = 永遠深色玻璃）
@@ -117,9 +117,6 @@
             top: ${BUTTON_TOP};
             padding: 12px 22px;
             font-size: 15px;
-            color: #fff;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-            background: ${GLASS_SHEEN}, rgba(36, 160, 72, ${alpha(0.6)});
         }
         #tm-extract-toggle {
             top: ${PANEL_TOP};
@@ -157,7 +154,6 @@
             box-shadow: inset 0 1px 1px var(--tm-rim), 0 1px 3px rgba(0, 0, 0, 0.1);
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
         }
-        #tm-extract-panel .tm-mini.tm-primary { background: rgba(10, 132, 255, ${alpha(0.7)}); color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2); }
         #tm-extract-panel .tm-mini:hover { transform: scale(1.06); filter: brightness(1.06); }
         #tm-extract-panel .tm-mini:active { transform: scale(1.12); }
         #tm-extract-list {
@@ -220,7 +216,7 @@
 
             const copyBtn = document.createElement('button');
             copyBtn.type = 'button';
-            copyBtn.className = 'tm-mini tm-primary';
+            copyBtn.className = 'tm-mini';
             copyBtn.textContent = '📋 複製全部';
             copyBtn.onclick = () => {
                 navigator.clipboard.writeText(Array.from(extractedLinks).join('\n'));

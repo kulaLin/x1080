@@ -160,7 +160,7 @@ When the page has 「按次數下載」 (download by count) buttons, a 「⚡ �
 | `AUTO_CLOSE_TAB` | `true` | Close the tab when done |
 | `CLOSE_DELAY_MS` | `100` | Milliseconds to wait before closing after everything is done |
 | `WAIT_TIMEOUT_MS` | `20000` | Maximum milliseconds to wait for all attachments; on timeout the tab is not closed |
-| `BUTTON_TOP` | `'calc(35vh - 10px)'` | Distance of the extract button from the top of the screen (`35vh` = 35% of the screen height, `- 10px` = 10 pixels higher; smaller = higher); the intercept panel follows below it |
+| `BUTTON_TOP` | `'calc(35vh - 15px)'` | Distance of the extract button from the top of the screen (`35vh` = 35% of the screen height, `- 15px` = 15 pixels higher; smaller = higher); the intercept panel follows below it |
 | `GLASS_THEME` | `'auto'` | Liquid Glass tone: `'auto'` follows the system light/dark mode, `'light'` always light, `'dark'` always dark |
 | `GLASS_OPACITY` | `0.3` | Liquid Glass opacity, like the iOS 27 transparency slider (`0` = most transparent, `1` = fully opaque; raise it if text is hard to read) |
 
