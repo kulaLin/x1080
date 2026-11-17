@@ -242,7 +242,7 @@ Open the settings panel with the **⚙️** on the handle, by **right-clicking**
 
 File: `x1080-visited-marker.user.js` (Tampermonkey name: [x1080] 瀏覽｜已開連結標記)
 
-Instead of asking the browser whether a link was visited, each page records its own URL in the script's storage when it loads, and list pages compare their links against that record — matches are dimmed and get a ✓ (no ✓ on board list pages, `/boards/`). It is therefore unaffected by Chromium's `:visited` partitioning, and tabs opened in bulk with Linkclump, middle-click or Ctrl+click are marked too.
+Instead of asking the browser whether a link was visited, each page records its own URL in the script's storage when it loads, and list pages compare their links against that record — matches are dimmed and get a ✓ (no ✓ on board list pages, `/boards/`; a chosen board category is marked in purple instead). It is therefore unaffected by Chromium's `:visited` partitioning, and tabs opened in bulk with Linkclump, middle-click or Ctrl+click are marked too.
 
 Domains: 1080xin.com and agaghhh.cc (old domain; records are shared).
 
@@ -261,7 +261,7 @@ Toggle mark display, mark all links on this page as visited, export records, imp
 
 ### Settings
 
-The `CONFIG` object at the top of the script controls the mark appearance (opacity, colour, ✓ badge and the pages that skip it via `NO_BADGE_PATHS`, row dimming), URL normalisation rules (`DROP_PARAMS`, etc.), recording rules and the record limit (20,000 by default).
+The `CONFIG` object at the top of the script controls the mark appearance (opacity, colour, ✓ badge and the pages that skip it via `NO_BADGE_PATHS`, row dimming, and `PAGE_STYLES` for a different colour scheme on specific pages, matched by path plus URL parameters so pagination still matches), URL normalisation rules (`DROP_PARAMS`, etc.), recording rules and the record limit (20,000 by default).
 
 > Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
 

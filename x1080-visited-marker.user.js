@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 瀏覽｜已開連結標記
 // @namespace    https://github.com/kulaLin/x1080
-// @version      1.3
+// @version      1.5
 // @description  自行記錄開過的連結並標記，完全不依賴瀏覽器 :visited，可解決 Chromium 分區化後 Linkclump 等擴充功能大量開啟的連結不變色的問題
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -40,6 +40,16 @@
  板塊列表頁（/boards/…）上的已開連結只淡化、變灰、整列加底色，不加 ✓。
  其他頁面照舊。要增減套用的頁面，改 CONFIG.NO_BADGE_PATHS 即可。
  網站是 Next.js，換頁不一定重新載入，所以每次重新掃描連結時都會重新判斷一次。
+
+ 特定頁面換顏色（v1.5 新增）
+ ─────────────────────────────────────────────────────────────
+ CONFIG.PAGE_STYLES 可以替特定頁面換一套已開標記（顏色、透明度、勾號、整列底色）。
+ 用路徑加指定的網址參數比對，其他參數（例如頁碼）不看，翻頁照樣套用；
+ 第一筆符合的生效，沒寫到的項目沿用預設。
+ 目前設定：板塊 2SeUSjSuXYiPAfTkWMNc9T 的 category_id=7Nc1bYbYpV7VOzzAdzqO81 分類，
+ 已開連結用紫色、不打勾、整列淡紫底。
+ 標記樣式改寫在腳本自己的 <style>，不再在頁面 <html> 上加 class，避免被網站重新繪製時洗掉。
+ （v1.4 的陰影拉桿已退回移除；版本號跳到 1.5，裝過 1.4 的也能自動更新。）
 
  安裝
  ─────────────────────────────────────────────────────────────
@@ -85,6 +95,17 @@
         DIM_ROW: true,              // 是否讓整列也淡一點
         ROW_SELECTOR: 'tr, li',     // 「一列」怎麼認定
         ROW_BG: 'rgba(128,128,128,.10)',
+        PAGE_STYLES: [              // 特定頁面換一套標記，見上方「特定頁面換顏色」
+            {
+                // https://1080xin.com/boards/2SeUSjSuXYiPAfTkWMNc9T?category_id=7Nc1bYbYpV7VOzzAdzqO81
+                path: /^\/boards\/2SeUSjSuXYiPAfTkWMNc9T\/?$/,
+                params: { category_id: '7Nc1bYbYpV7VOzzAdzqO81' },
+                color: '#7F77DD',               // 紫
+                opacity: 0.75,                  // 比預設 0.45 高，顏色才看得出來
+                badge: '',                      // 不打勾
+                rowBg: 'rgba(127,119,221,.10)', // 整列淡紫底
+            },
+        ],
 
         // 網址正規化：決定兩個網址算不算同一筆
         MERGE_THREAD_PAGES: true,   // 同一主題的第 2、3 頁視為同一筆
@@ -110,7 +131,6 @@
     const STORE_KEY = 'seen_v1';
     const ENABLED_KEY = 'enabled_v1';
     const MIGRATED_KEY = 'host_migrated_v1';
-    const NO_BADGE_CLASS = 'vm-no-badge';
 
     // ===== 儲存 ============================================================
     let store = read();
@@ -234,18 +254,8 @@
 
     // ===== 樣式 ============================================================
     function injectCSS() {
-        const color = CONFIG.MARK_COLOR
-            ? `a[data-seen="1"], a[data-seen="1"] * { color: ${CONFIG.MARK_COLOR} !important; }` : '';
-        // html 上有 NO_BADGE_CLASS 時不加勾號，由 syncBadgeMode() 依目前路徑切換
-        const badge = CONFIG.BADGE
-            ? `html:not(.${NO_BADGE_CLASS}) a[data-seen="1"]::after { content: "${CONFIG.BADGE}"; font-size: .85em; opacity: .8; }` : '';
-        const row = CONFIG.DIM_ROW
-            ? `[data-seen-row="1"] { background-color: ${CONFIG.ROW_BG} !important; }` : '';
+        // 已開連結的標記樣式會隨頁面變，放在 refreshDynamicCSS() 另外管理
         const css = `
-            a[data-seen="1"] { opacity: ${CONFIG.DIM_OPACITY} !important; }
-            ${color}
-            ${badge}
-            ${row}
             #vm-toast {
                 position: fixed; right: 16px; bottom: 16px; z-index: 2147483647;
                 background: #202124; color: #fff; font: 13px/1.5 system-ui, sans-serif;
@@ -274,12 +284,43 @@
         (document.head || document.documentElement).appendChild(el);
     }
 
-    // 依目前路徑決定要不要顯示勾號。Next.js 換頁不一定重新載入，所以掃描時都重判一次
-    function syncBadgeMode() {
-        const root = document.documentElement;
-        if (!root) return;
-        const off = CONFIG.NO_BADGE_PATHS.some(re => re.test(location.pathname));
-        root.classList.toggle(NO_BADGE_CLASS, off);
+    // 目前頁面要用的標記樣式：先取預設值，再套上第一筆符合的 PAGE_STYLES
+    function pageMatches(ps) {
+        if (ps.path && !ps.path.test(location.pathname)) return false;
+        const q = new URLSearchParams(location.search);
+        return Object.entries(ps.params || {}).every(([k, v]) => q.get(k) === v);
+    }
+
+    function currentStyle() {
+        const s = {
+            color: CONFIG.MARK_COLOR,
+            opacity: CONFIG.DIM_OPACITY,
+            badge: CONFIG.NO_BADGE_PATHS.some(re => re.test(location.pathname)) ? '' : CONFIG.BADGE,
+            rowBg: CONFIG.ROW_BG,
+        };
+        const ps = CONFIG.PAGE_STYLES.find(pageMatches);
+        if (ps) for (const k of Object.keys(s)) if (ps[k] !== undefined) s[k] = ps[k];
+        return s;
+    }
+
+    // 標記樣式寫進腳本自己的 <style>，不動頁面的 <html>，避免被 Next.js 重新繪製時洗掉。
+    // 換頁不一定重新載入，所以每次掃描連結都重算一次；樣式沒變就不動。
+    let dynEl = null, dynCss = null;
+    function refreshDynamicCSS() {
+        const s = currentStyle();
+        const parts = [`a[data-seen="1"] { opacity: ${s.opacity} !important; }`];
+        if (s.color) parts.push(`a[data-seen="1"], a[data-seen="1"] * { color: ${s.color} !important; }`);
+        if (s.badge) parts.push(`a[data-seen="1"]::after { content: ${JSON.stringify(s.badge)}; font-size: .85em; opacity: .8; }`);
+        if (CONFIG.DIM_ROW && s.rowBg) parts.push(`[data-seen-row="1"] { background-color: ${s.rowBg} !important; }`);
+        const css = parts.join('\n');
+        if (dynEl && dynEl.isConnected && css === dynCss) return;
+        if (!dynEl || !dynEl.isConnected) {
+            dynEl = document.createElement('style');
+            dynEl.id = 'vm-dyn';
+            (document.head || document.documentElement).appendChild(dynEl);
+        }
+        dynEl.textContent = css;
+        dynCss = css;
     }
 
     // ===== 標記 ============================================================
@@ -302,7 +343,7 @@
     function scan() {
         clearTimeout(scanTimer);
         scanTimer = setTimeout(() => {
-            syncBadgeMode();
+            refreshDynamicCSS();
             document.querySelectorAll('a[href]').forEach(apply);
         }, 60);
     }
@@ -506,7 +547,7 @@
 
     // ===== 啟動 ============================================================
     injectCSS();
-    syncBadgeMode();
+    refreshDynamicCSS();
     migrateHosts();
 
     if (CONFIG.RECORD_ON_LOAD && !ignored(location.href)) {
