@@ -18,7 +18,7 @@
 |---|---|---|---|
 | [x1080] 下載｜磁力連結面板＋Notion | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區、LTX無碼破解BT區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion（子頁面附時間戳記）後自動關閉分頁；搭配擴充功能可立刻切到下一個分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
-| [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
+| [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部；可拖曳移動、設定面板調整位置與外觀 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區） | [x1080-clean-layout](#x1080-clean-layout) | 隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
 | [x1080] 瀏覽｜已開連結標記 | [x1080-visited-marker](#x1080-visited-marker) | 自行記錄開過的連結並淡化＋打勾，不依賴瀏覽器 :visited（Linkclump 大量開啟也有效） | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
 | [x1080] 瀏覽｜板塊新文章通知 | [x1080-board-watch](#x1080-board-watch) | 定時檢查關注的板塊，有新文章就用 Telegram 與桌面通知提醒 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js) |
@@ -53,7 +53,7 @@
 
 ### 腳本之間的已知衝突（待確認）
 
-- **x1080-magnet-notion 與 x1080-attachment-panel 位置重疊**（2026-11-15 記錄）：兩者都固定在畫面右側。「下載地址」面板在 top 200px、寬 340px；附件懸浮區塊在 top 260px、寬 280px。同一篇文章同時有 magnet 與附件時會疊在一起，「下載地址」面板層級較高，會蓋住附件區塊。實際遇到後再決定：其中一個往下移、改到左側，或自動錯開。兩支腳本內都有「[已知問題]」註解標示位置設定處。
+- **x1080-magnet-notion 與 x1080-attachment-panel 位置重疊**（2026-11-15 記錄）：兩者都固定在畫面右側。「下載地址」面板在 top 200px、寬 340px；附件懸浮區塊在 top 260px、寬 280px。同一篇文章同時有 magnet 與附件時會疊在一起，「下載地址」面板層級較高，會蓋住附件區塊。attachment-panel v4.7 起遇到時可直接拖曳附件區塊的把手錯開（位置會記住）；是否改預設位置或兩者自動錯開，實際使用後再決定。兩支腳本內都有「[已知問題]」註解標示位置設定處。
 
 ---
 
@@ -203,21 +203,28 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 
 ### 功能
 
-- 附件區塊懸浮在畫面右側（寬 280px），內容過長時可在區塊內捲動
+- 附件區塊懸浮在畫面右側（預設寬 280px），內容過長時可在區塊內捲動
+- 區塊上方有一條拖曳把手：按住拖曳就能移動到任何位置（X/Y 軸），拖曳時把手上即時顯示座標，放開後自動記住；視窗變小時自動夾回畫面內，換回大螢幕會回到原位
+- 把手上的 ↺ 位置恢復預設、⚙️ 開啟設定面板；可在設定裡鎖定位置，避免誤拖
 - 所有內層容器改為單欄垂直排列，檔名完整橫向顯示，不會被擠成直條
 - 「按次數下載／下載」按鈕移到區塊最底部並填滿整行
 - 隱藏「各身份價格」按鈕與價格階梯（`.price-tiers`，各會員等級的點數／免費／無下載資格列表）、「下載說明」連結與 RAR 圖示
 - 網站動態載入或換頁時自動重新套用
 
-### 設定（腳本開頭的常數）
+### 設定面板
 
-| 常數 | 預設 | 說明 |
+把手上的 **⚙️**、在把手上**按右鍵**，或 Tampermonkey 選單的「⚙️ 附件區塊設定」，都能打開設定面板（Tampermonkey 選單另有「↺ 附件區塊位置恢復預設」）。外觀與 x1080-attachment-extract 的設定面板一致：調整後立即生效並自動儲存在 Tampermonkey 裡，腳本自動更新也會保留；按「重設」回到預設值，按 Esc 或「完成」關閉。頁面上沒有附件時，會放一個預覽框方便看位置、寬度與透明度。
+
+| 設定 | 預設 | 說明 |
 |---|---|---|
-| `TOP_OFFSET` | `'260px'` | 懸浮區塊距離畫面頂端的高度，數字越大越往下 |
-| `BG_OPACITY` | `0` | 背景不透明度：`0` = 完全透明，`0.2` = 微透黑底 |
-| `BLUR_PX` | `'8px'` | 毛玻璃模糊程度：`'0px'` = 不模糊，`'8px'` = 微毛玻璃 |
+| 水平位置（X 軸） | 距離右邊 `16` px | 滑桿或直接輸入數字；也可以直接拖曳把手 |
+| 垂直位置（Y 軸） | 距離頂端 `260` px | 指把手上緣；滑桿或直接輸入數字 |
+| 寬度 | `280` px | `200`～`600` px |
+| 鎖定位置 | 關 | 開 = 把手不能拖曳 |
+| 背景不透明度 | `0%` | `0%` = 完全透明，`20%` = 微透黑底 |
+| 毛玻璃模糊 | `8` px | `0` = 不模糊，`8` = 微毛玻璃（防背景文字干擾閱讀） |
 
-> 注意：要改設定請改 repo 裡的檔案。直接在 Tampermonkey 編輯器改，下次自動更新時會被覆蓋。
+> 預設值寫在腳本開頭的 `DEFAULTS`。v4.7 起需要 `GM_getValue`／`GM_setValue`／`GM_registerMenuCommand` 權限來記住設定，舊版在腳本裡改的 `TOP_OFFSET` 等常數不會帶過來，請在設定面板重新調整。
 
 ---
 

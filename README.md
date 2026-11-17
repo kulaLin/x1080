@@ -20,7 +20,7 @@ Tampermonkey userscripts for 1080xin (x1080x).
 |---|---|---|---|
 | [x1080] 下載｜磁力連結面板＋Notion<br>(Download · Magnet panel + Notion) | [x1080-magnet-notion](#x1080-magnet-notion) | Right-side "download links" panel on posts in BT綜合區 (BT board) and LTX無碼破解BT區 (LTX BT board): copy magnet links, send them to Notion in one click (with timestamps on the sub-page), then auto-close the tab; with the companion extension it jumps to the next tab right away | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取<br>(Download · One-click attachment link extractor) | [x1080-attachment-extract](#x1080-attachment-extract) | Clicks every "download by count" attachment button, intercepts the real download URLs and tokens, then auto-closes the tab | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
-| [x1080] 版面｜附件區塊右側懸浮<br>(Layout · Floating attachment panel) | [x1080-attachment-panel](#x1080-attachment-panel) | Turns the attachment section into a floating, vertical, transparent panel on the right, with the download button at the bottom | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
+| [x1080] 版面｜附件區塊右側懸浮<br>(Layout · Floating attachment panel) | [x1080-attachment-panel](#x1080-attachment-panel) | Turns the attachment section into a floating, vertical, transparent panel on the right, with the download button at the bottom; drag to move, settings panel for position and look | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區）<br>(Layout · Clean-up: hide stats / signature / replies) | [x1080-clean-layout](#x1080-clean-layout) | Hides the stats under the title, signature ads, the action bar and the reply area | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
 | [x1080] 瀏覽｜已開連結標記<br>(Browse · Visited-link marker) | [x1080-visited-marker](#x1080-visited-marker) | Keeps its own record of opened links and dims them with a ✓, without relying on the browser's `:visited` (works with Linkclump bulk opening) | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
 | [x1080] 瀏覽｜板塊新文章通知<br>(Browse · New-post notifier for boards) | [x1080-board-watch](#x1080-board-watch) | Checks watched boards on a schedule and notifies new posts via Telegram and desktop notifications | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js) |
@@ -55,7 +55,7 @@ Every new or changed script follows these rules.
 
 ### Known conflict between scripts (to be confirmed)
 
-- **x1080-magnet-notion and x1080-attachment-panel overlap** (recorded 2026-11-15): both are fixed to the right side of the screen. The "download links" panel sits at top 200px, width 340px; the floating attachment panel at top 260px, width 280px. On a post that has both magnets and attachments they overlap, and the download-links panel (higher z-index) covers the attachment panel. To be decided once it actually happens: move one down, move one to the left, or offset them automatically. Both scripts mark the position setting with a `[已知問題]` comment.
+- **x1080-magnet-notion and x1080-attachment-panel overlap** (recorded 2026-11-15): both are fixed to the right side of the screen. The "download links" panel sits at top 200px, width 340px; the floating attachment panel at top 260px, width 280px. On a post that has both magnets and attachments they overlap, and the download-links panel (higher z-index) covers the attachment panel. Since attachment-panel v4.7 you can drag the attachment panel's handle out of the way when it happens (the position is remembered); whether to change the default position or offset them automatically is still to be decided after real use. Both scripts mark the position setting with a `[已知問題]` comment.
 
 ---
 
@@ -205,21 +205,28 @@ Pins the post's attachment section (`section.attachments-section`) to the right 
 
 ### Features
 
-- The attachment section floats on the right (280px wide) and scrolls inside itself when too long
+- The attachment section floats on the right (280px wide by default) and scrolls inside itself when too long
+- A drag handle sits on top of the panel: hold and drag to move it anywhere (X/Y axes); the handle shows live coordinates while dragging and the position is saved on release. In a smaller window it is pulled back inside the screen, and it returns to its saved spot on a larger one
+- The handle's ↺ restores the default position and ⚙️ opens the settings panel; the position can be locked in settings to avoid accidental drags
 - All inner containers become a single vertical column; file names show in full instead of being squeezed into a narrow strip
 - The 「按次數下載／下載」 (download) button moves to the bottom of the panel and fills the full width
 - Hides the 「各身份價格」 (price per member level) button and the price-tier list (`.price-tiers` — points / free / not eligible per member level), the 「下載說明」 (download help) link and the RAR icon
 - Re-applies automatically when the site loads content dynamically or changes pages
 
-### Settings (constants at the top of the script)
+### Settings panel
 
-| Constant | Default | Description |
+Open the settings panel with the **⚙️** on the handle, by **right-clicking** the handle, or with the Tampermonkey menu item 「⚙️ 附件區塊設定」 (the menu also has 「↺ 附件區塊位置恢復預設」 to restore the default position). It looks and works like the x1080-attachment-extract settings panel: changes apply immediately and are saved in Tampermonkey, so they survive script auto-updates; 「重設」 (Reset) restores the defaults, and Esc or 「完成」 (Done) closes the panel. On pages without attachments a preview box appears so you can see the position, width and opacity.
+
+| Setting | Default | Description |
 |---|---|---|
-| `TOP_OFFSET` | `'260px'` | Distance of the panel from the top of the screen; larger = lower |
-| `BG_OPACITY` | `0` | Background opacity: `0` = fully transparent, `0.2` = light dark tint |
-| `BLUR_PX` | `'8px'` | Frosted-glass blur: `'0px'` = none, `'8px'` = light frosted glass |
+| Horizontal position (X) | `16` px from the right | Slider or type a number; or just drag the handle |
+| Vertical position (Y) | `260` px from the top | Top edge of the handle; slider or type a number |
+| Width | `280` px | `200`–`600` px |
+| Lock position | Off | On = the handle cannot be dragged |
+| Background opacity | `0%` | `0%` = fully transparent, `20%` = light dark tint |
+| Frosted-glass blur | `8` px | `0` = none, `8` = light frosted glass (keeps background text from distracting) |
 
-> Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
+> The defaults live in `DEFAULTS` at the top of the script. From v4.7 the script needs the `GM_getValue` / `GM_setValue` / `GM_registerMenuCommand` grants to remember settings; constants such as `TOP_OFFSET` edited in older versions are not carried over, so set them again in the settings panel.
 
 ---
 
