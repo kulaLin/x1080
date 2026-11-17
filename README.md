@@ -161,6 +161,8 @@ Open the settings panel by **right-clicking** the extract button, the **⚙️**
 | Vertical position (Y) | 35% of the screen height, 15 px higher | Slider or type a number; the intercept panel follows below the button |
 | Glass opacity | `30%` | Like the iOS 27 transparency slider: `0%` most transparent, `100%` fully opaque; raise it if text is hard to read |
 | Glass tone | Auto | Auto (follows the system light/dark mode) / Light / Dark |
+| Shadow depth | `18%` | How dark the shadow around the glass buttons and panels is; `0%` = no shadow |
+| Shadow size | `30` px | How far the shadow spreads; larger looks softer and more raised |
 | Close the tab when done | On | |
 | Wait before closing the tab | `100` ms | How long to wait after every attachment has started downloading |
 | Maximum wait for attachments | `20` s | On timeout some attachment failed, so the tab is not closed |

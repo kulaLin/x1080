@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜附件連結一鍵提取
 // @namespace    https://github.com/kulaLin/x1080
-// @version      2.14
+// @version      2.15
 // @description  自動點擊「按次數下載」並攔截真實下載網址與 Token，完成後自動關閉分頁
 // @author       Gemini
 // @match        *://1080xin.com/*
@@ -29,6 +29,8 @@
         buttonTop: null,            // 按鈕距離畫面頂端幾 px（Y 軸；null = 畫面高度的 35% 再往上 15px）
         glassOpacity: 0.3,          // 液態玻璃不透明度，類似 iOS 27 的透明度滑桿（0 = 最透明，1 = 完全不透明）
         glassTheme: 'auto',         // 液態玻璃深淺：'auto' 跟著系統淺色 / 深色模式，'light' 永遠淺色，'dark' 永遠深色
+        shadowOpacity: 0.18,        // 液態玻璃陰影深淺（0 = 沒有陰影，1 = 最深）
+        shadowSize: 30,             // 液態玻璃陰影大小：陰影往外擴散的範圍（px；越大越柔和、離畫面越「浮」）
         autoCloseTab: true,         // 一鍵提取完成後是否自動關閉分頁
         closeDelayMs: 100,          // 全部附件都開始下載後，等幾毫秒再關閉分頁（1000 = 1 秒）
         waitTimeoutMs: 20000,       // 最多等幾毫秒讓所有附件完成；超時代表有附件沒成功，就不自動關閉
@@ -94,6 +96,13 @@
         const a = Math.min(Math.max(Number(settings.glassOpacity) || 0, 0), 1);
         const alpha = (min) => (min + a * (1 - min)).toFixed(2);   // 把 0~1 的設定換算成實際的透明度
         const pos = layout();
+        // 陰影：一層大範圍的柔和陰影 + 一層貼近邊緣的細陰影（預設 = 0 10px 30px 18% 黑 + 0 2px 8px 10% 黑）
+        const shadowA = Math.min(Math.max(Number(settings.shadowOpacity) || 0, 0), 1);
+        const shadowPx = Math.max(0, Number(settings.shadowSize) || 0);
+        const outerShadow = shadowA > 0 && shadowPx > 0
+            ? `,\n                0 ${Math.round(shadowPx / 3)}px ${shadowPx}px rgba(0, 0, 0, ${shadowA.toFixed(3)}),\n                0 ${Math.max(1, Math.round(shadowPx / 15))}px ${Math.max(1, Math.round(shadowPx * 0.27))}px rgba(0, 0, 0, ${(shadowA * 0.55).toFixed(3)})`
+            : '';
+        const miniShadow = shadowA > 0 ? `, 0 1px 3px rgba(0, 0, 0, ${(shadowA * 0.55).toFixed(3)})` : '';
         const darkVars = `
             --tm-fill: rgba(28, 28, 32, ${alpha(0.3)});
             --tm-sheet: rgba(28, 28, 32, ${Math.max(0.8, a).toFixed(2)});
@@ -141,9 +150,7 @@
             box-shadow:
                 inset 0 1px 1px var(--tm-rim),
                 inset 0 -1px 1px rgba(255, 255, 255, 0.2),
-                inset 0 0 18px rgba(255, 255, 255, 0.12),
-                0 10px 30px rgba(0, 0, 0, 0.18),
-                0 2px 8px rgba(0, 0, 0, 0.1);
+                inset 0 0 18px rgba(255, 255, 255, 0.12)${outerShadow};
             transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
         }
         ${darkBlock}
@@ -212,7 +219,7 @@
             font-weight: 600;
             line-height: 1.5;
             cursor: pointer;
-            box-shadow: inset 0 1px 1px var(--tm-rim), 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: inset 0 1px 1px var(--tm-rim)${miniShadow};
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
         }
         #tm-extract-panel .tm-mini:hover, #tm-settings-panel .tm-mini:hover { transform: scale(1.06); filter: brightness(1.06); }
@@ -238,13 +245,17 @@
             width: 360px;
             max-width: calc(100vw - 24px);
             max-height: calc(100vh - 24px);
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
             padding: 14px 16px 16px;
             border-radius: 24px;
             font-size: 13px;
             line-height: 1.5;
         }
         #tm-settings-panel::before { inset: 0; }
+        /* 標題列固定在上方，項目太多時只有下面的內容捲動 */
+        #tm-settings-panel .tm-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 0 16px; }
         #tm-settings-panel .tm-title { font-size: 15px; }
         #tm-settings-panel .tm-sec { margin: 12px 4px 6px; font-size: 12px; font-weight: 600; color: var(--tm-sub); }
         #tm-settings-panel .tm-group { border-radius: 14px; background: var(--tm-mini); border: 1px solid var(--tm-edge); overflow: hidden; }
@@ -532,6 +543,9 @@
         { section: '外觀' },
         { key: 'glassOpacity', label: '玻璃不透明度', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100 },
         { key: 'glassTheme', label: '玻璃深淺', type: 'seg', options: [['auto', '自動'], ['light', '淺色'], ['dark', '深色']] },
+        { section: '陰影' },
+        { key: 'shadowOpacity', label: '陰影深淺（0% = 沒有陰影）', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100 },
+        { key: 'shadowSize', label: '陰影大小', type: 'range', unit: 'px', min: 0, step: 1, max: () => 80 },
         { section: '行為' },
         { key: 'autoCloseTab', label: '完成後自動關閉分頁', type: 'switch' },
         { key: 'closeDelayMs', label: '關閉分頁前等待', type: 'number', unit: '毫秒', min: 0, step: 100 },
@@ -683,17 +697,19 @@
         title.appendChild(btns);
         sp.appendChild(title);
 
+        const body = el('div', 'tm-body');
+        sp.appendChild(body);
         let group = null;
         for (const f of SETTING_FIELDS) {
             if (f.section) {
-                sp.appendChild(el('div', 'tm-sec', f.section));
+                body.appendChild(el('div', 'tm-sec', f.section));
                 group = el('div', 'tm-group');
-                sp.appendChild(group);
+                body.appendChild(group);
                 continue;
             }
             group.appendChild(buildSettingRow(f));
         }
-        sp.appendChild(el('div', 'tm-hint', '調整後立即生效並自動儲存，腳本更新也會保留。在一鍵提取按鈕上按右鍵、攔截面板的 ⚙️，或 Tampermonkey 選單都能開啟這裡；按 Esc 關閉。'));
+        body.appendChild(el('div', 'tm-hint', '調整後立即生效並自動儲存，腳本更新也會保留。在一鍵提取按鈕上按右鍵、攔截面板的 ⚙️，或 Tampermonkey 選單都能開啟這裡；按 Esc 關閉。'));
 
         document.body.appendChild(sp);
         refreshSettingsUI();
