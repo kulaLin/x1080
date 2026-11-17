@@ -18,7 +18,7 @@
 |---|---|---|---|
 | [x1080] 下載｜磁力連結面板＋Notion | [x1080-magnet-notion](#x1080-magnet-notion) | BT綜合區、LTX無碼破解BT區文章右側「下載地址」面板：複製 magnet、一鍵送 Notion（子頁面附時間戳記）後自動關閉分頁；搭配擴充功能可立刻切到下一個分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取 | [x1080-attachment-extract](#x1080-attachment-extract) | 附件「按次數下載」一鍵全部點擊，攔截真實下載網址與 Token，完成後自動關閉分頁 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
-| [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列、透明背景，下載按鈕移到最底部；可拖曳移動、設定面板調整位置與外觀 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
+| [x1080] 版面｜附件區塊右側懸浮 | [x1080-attachment-panel](#x1080-attachment-panel) | 附件區塊改為右側懸浮、垂直排列，下載按鈕移到最底部；可拖曳移動，可選 iOS 27 液態玻璃或經典透明風格 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區） | [x1080-clean-layout](#x1080-clean-layout) | 隱藏標題下方數據、簽名檔廣告、操作列與底部回覆區 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
 | [x1080] 瀏覽｜已開連結標記 | [x1080-visited-marker](#x1080-visited-marker) | 自行記錄開過的連結並淡化＋打勾，不依賴瀏覽器 :visited（Linkclump 大量開啟也有效） | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
 | [x1080] 瀏覽｜板塊新文章通知 | [x1080-board-watch](#x1080-board-watch) | 定時檢查關注的板塊，有新文章就用 Telegram 與桌面通知提醒 | [安裝](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js) |
@@ -199,13 +199,16 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 
 > 已知衝突：與 x1080-magnet-notion 的右側面板位置重疊，見上方「腳本之間的已知衝突」。
 
-把文章內的附件區塊（`section.attachments-section`）固定在畫面右側，改成垂直排列、透明背景。網站原本的下載按鈕完整保留，只是移到最底部。
+把文章內的附件區塊（`section.attachments-section`）固定在畫面右側，改成垂直排列，外觀可選 iOS 27 液態玻璃（Liquid Glass）或經典透明毛玻璃。網站原本的下載按鈕完整保留，只是移到最底部。
 
 ### 功能
 
 - 附件區塊懸浮在畫面右側（預設寬 280px），內容過長時可在區塊內捲動
 - 區塊上方有一條拖曳把手：按住拖曳就能移動到任何位置（X/Y 軸），拖曳時把手上即時顯示座標，放開後自動記住；視窗變小時自動夾回畫面內，換回大螢幕會回到原位
 - 把手上的 ↺ 位置恢復預設、⚙️ 開啟設定面板；可在設定裡鎖定位置，避免誤拖
+- 兩種風格可切換：
+  - **液態玻璃**（預設）：和 x1080-attachment-extract 同一套 iOS 27 液態玻璃樣式，半透明模糊、提高飽和度、邊緣光線高光；把手與區塊接成同一片玻璃，下載按鈕改成無色玻璃膠囊、按下時微微膨脹。玻璃深淺可跟著系統淺色／深色模式，或固定淺色、深色；系統開啟「減少透明度」時改為不透明
+  - **經典**：v4.7 以前的透明背景加毛玻璃
 - 所有內層容器改為單欄垂直排列，檔名完整橫向顯示，不會被擠成直條
 - 「按次數下載／下載」按鈕移到區塊最底部並填滿整行
 - 隱藏「各身份價格」按鈕與價格階梯（`.price-tiers`，各會員等級的點數／免費／無下載資格列表）、「下載說明」連結與 RAR 圖示
@@ -221,10 +224,13 @@ token 只存在本機瀏覽器的 Tampermonkey 儲存空間，不在此 repo 中
 | 垂直位置（Y 軸） | 距離頂端 `260` px | 指把手上緣；滑桿或直接輸入數字 |
 | 寬度 | `280` px | `200`～`600` px |
 | 鎖定位置 | 關 | 開 = 把手不能拖曳 |
-| 背景不透明度 | `0%` | `0%` = 完全透明，`20%` = 微透黑底 |
-| 毛玻璃模糊 | `8` px | `0` = 不模糊，`8` = 微毛玻璃（防背景文字干擾閱讀） |
+| 風格 | 液態玻璃 | 液態玻璃／經典；下面的選項會跟著風格切換 |
+| 玻璃不透明度（液態玻璃） | `30%` | 類似 iOS 27 的透明度滑桿，`0%` 最透明、`100%` 完全不透明；字看不清楚就調高 |
+| 玻璃深淺（液態玻璃） | 自動 | 自動（跟著系統淺色／深色模式）／淺色／深色；系統與網站深淺不同時，改成跟網站一樣 |
+| 背景不透明度（經典） | `0%` | `0%` = 完全透明，`20%` = 微透黑底 |
+| 毛玻璃模糊（經典） | `8` px | `0` = 不模糊，`8` = 微毛玻璃（防背景文字干擾閱讀） |
 
-> 預設值寫在腳本開頭的 `DEFAULTS`。v4.7 起需要 `GM_getValue`／`GM_setValue`／`GM_registerMenuCommand` 權限來記住設定，舊版在腳本裡改的 `TOP_OFFSET` 等常數不會帶過來，請在設定面板重新調整。
+> 預設值寫在腳本開頭的 `DEFAULTS`。v4.7 起需要 `GM_getValue`／`GM_setValue`／`GM_registerMenuCommand` 權限來記住設定，舊版在腳本裡改的 `TOP_OFFSET` 等常數不會帶過來，請在設定面板重新調整。v4.8 起預設為液態玻璃，想要原本的樣子請在設定把「風格」切到「經典」。
 
 ---
 

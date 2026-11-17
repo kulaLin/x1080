@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [x1080] 版面｜附件區塊右側懸浮
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.7
-// @description  將 attachments-section 改為右側懸浮、垂直排列、透明背景、下載按鈕移至最底部、隱藏各身份價格階梯；拖曳上方把手可移動位置（X/Y 軸），設定面板可調位置、寬度、透明度與模糊，100%保留原生按鈕
+// @version      4.8
+// @description  將 attachments-section 改為右側懸浮、垂直排列、下載按鈕移至最底部、隱藏各身份價格階梯；拖曳上方把手可移動位置（X/Y 軸），可選 iOS 27 液態玻璃（Liquid Glass）或經典透明風格，設定面板可調位置、寬度、透明度與深淺，100%保留原生按鈕
 // @match        *://*.1080xin.com/*
 // @match        *://1080xin.com/*
 // @run-at       document-start
@@ -25,11 +25,16 @@
         panelRight: 16,       // 水平位置（X 軸）：區塊右緣距離畫面右邊幾 px
         panelTop: 260,        // 垂直位置（Y 軸）：區塊上緣（拖曳把手）距離畫面頂端幾 px
         panelWidth: 280,      // 區塊寬度（px）
-        bgOpacity: 0,         // 背景不透明度：0 = 完全透明，0.2 = 微透黑底
-        blurPx: 8,            // 毛玻璃模糊程度（px）：0 = 不模糊，8 = 微毛玻璃（防背景文字干擾閱讀）
         lockPosition: false,  // true = 鎖定位置，把手不能拖曳
+        panelStyle: 'glass',  // 風格：'glass' = iOS 27 液態玻璃（Liquid Glass），'classic' = 經典透明毛玻璃（v4.7 以前的樣子）
+        glassOpacity: 0.3,    // 【液態玻璃】玻璃不透明度，類似 iOS 27 的透明度滑桿（0 = 最透明，1 = 完全不透明）
+        glassTheme: 'auto',   // 【液態玻璃】深淺：'auto' 跟著系統淺色 / 深色模式，'light' 永遠淺色，'dark' 永遠深色
+        bgOpacity: 0,         // 【經典】背景不透明度：0 = 完全透明，0.2 = 微透黑底
+        blurPx: 8,            // 【經典】毛玻璃模糊程度（px）：0 = 不模糊，8 = 微毛玻璃（防背景文字干擾閱讀）
     };
     const SETTINGS_KEY = 'settings';
+    const STYLES = ['glass', 'classic'];
+    const THEMES = ['auto', 'light', 'dark'];
     const HANDLE_H = 26;                       // 拖曳把手高度（px）
     const WIDTH_MIN = 200, WIDTH_MAX = 600;    // 寬度可調範圍（px）
     // [已知問題] 2026-11-15 記錄，待實際確認後調整
@@ -50,6 +55,8 @@
             const ok = typeof v === typeof DEFAULTS[key] && (typeof v !== 'number' || Number.isFinite(v));
             if (ok) result[key] = v;
         }
+        if (!STYLES.includes(result.panelStyle)) result.panelStyle = DEFAULTS.panelStyle;
+        if (!THEMES.includes(result.glassTheme)) result.glassTheme = DEFAULTS.glassTheme;
         return result;
     }
 
@@ -90,6 +97,60 @@
     const SHEEN = 'linear-gradient(160deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 62%, rgba(255,255,255,0.14) 100%)';
     const ACCENT = '#0a84ff';
 
+    // 系統深色模式、「減少透明度」偵測
+    const media = (q) => (window.matchMedia ? window.matchMedia(q) : { matches: false, addEventListener() {} });
+    const mqDark = media('(prefers-color-scheme: dark)');
+    const mqSolid = media('(prefers-reduced-transparency: reduce)');
+
+    // 液態玻璃要用深色還是淺色（經典風格時跟著系統，只影響設定面板）
+    function isDark() {
+        const theme = settings.panelStyle === 'glass' ? settings.glassTheme : 'auto';
+        return theme === 'dark' || (theme === 'auto' && mqDark.matches);
+    }
+
+    // 依目前風格算出外觀變數
+    // 液態玻璃（Liquid Glass）：半透明底色 + 背景模糊與提高飽和度 + 邊緣光線高光，和 x1080-attachment-extract 同一套數值
+    // 經典：v4.7 以前的透明毛玻璃
+    function appearance() {
+        const dark = isDark();
+        const a = clamp(Number(settings.glassOpacity) || 0, 0, 1);
+        const alpha = (min) => (min + a * (1 - min)).toFixed(2);   // 把 0~1 的設定換算成實際的透明度
+        const solid = mqSolid.matches;   // 系統開啟「減少透明度」時改成不透明
+        const fill = solid ? (dark ? 'rgb(44, 44, 46)' : 'rgb(242, 242, 247)')
+            : dark ? `rgba(28, 28, 32, ${alpha(0.3)})` : `rgba(255, 255, 255, ${alpha(0.12)})`;
+        const rim = dark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.9)';
+        const edge = dark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.45)';
+        const mini = dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.35)';
+        const common = {
+            text: dark ? '#f5f5f7' : '#1d1d1f',
+            rim,
+            edge,
+            btnBg: `linear-gradient(160deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 55%, rgba(255,255,255,0.12) 100%), ${mini}`,
+        };
+
+        if (settings.panelStyle === 'glass') {
+            return Object.assign(common, {
+                // 把手用光線最亮的上半段，附件區塊接著用下半段，兩塊接起來像同一片玻璃
+                handleBg: `linear-gradient(160deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.12) 100%), ${fill}`,
+                bg: `linear-gradient(160deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0.14) 100%), ${fill}`,
+                filter: solid ? 'none' : 'blur(12px) saturate(190%) brightness(1.05)',
+                border: `1px solid ${edge}`,
+                radius: '18px',
+                handleShadow: `inset 0 1px 1px ${rim}, 0 -2px 10px rgba(0, 0, 0, 0.06)`,
+                shadow: 'inset 0 -1px 1px rgba(255, 255, 255, 0.2), inset 0 0 18px rgba(255, 255, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1)',
+            });
+        }
+        return Object.assign(common, {
+            handleBg: 'rgba(128, 128, 128, 0.16)',
+            bg: `rgba(0, 0, 0, ${clamp(Number(settings.bgOpacity) || 0, 0, 1)})`,
+            filter: `blur(${clamp(Number(settings.blurPx) || 0, 0, 40)}px)`,
+            border: '1px solid rgba(128, 128, 128, 0.3)',
+            radius: '10px',
+            handleShadow: 'none',
+            shadow: 'none',
+        });
+    }
+
     // 位置、寬度、背景都用 :root 變數（--tm-ap-*）控制，拖曳或改設定時只改變數，不用重寫整份樣式
     const cssText = `
         /* 1. 保底：維持原本成功的 Flex 置頂結構 */
@@ -111,15 +172,16 @@
             width: var(--tm-ap-w, 280px) !important;
             max-height: max(120px, calc(100vh - var(--tm-ap-top, 260px) - ${HANDLE_H + 20}px)) !important;
             overflow-y: auto !important;
+            overflow-x: hidden !important;
             z-index: 999999 !important;
             margin: 0 !important;
             padding: 14px !important;
             background: var(--tm-ap-bg, transparent) !important;
-            backdrop-filter: blur(var(--tm-ap-blur, 8px)) !important;
-            -webkit-backdrop-filter: blur(var(--tm-ap-blur, 8px)) !important;
-            border: 1px solid rgba(128, 128, 128, 0.3) !important;
-            border-radius: 0 0 10px 10px !important;
-            box-shadow: none !important;
+            backdrop-filter: var(--tm-ap-filter, blur(8px)) !important;
+            -webkit-backdrop-filter: var(--tm-ap-filter, blur(8px)) !important;
+            border: var(--tm-ap-border, 1px solid rgba(128, 128, 128, 0.3)) !important;
+            border-radius: 0 0 var(--tm-ap-radius, 10px) var(--tm-ap-radius, 10px) !important;
+            box-shadow: var(--tm-ap-shadow, none) !important;
             display: flex !important;
             flex-direction: column !important;
             gap: 10px !important;
@@ -169,6 +231,33 @@
             display: none !important;
         }
 
+        /* 液態玻璃：文字顏色跟著玻璃深淺；下載按鈕改成無色玻璃膠囊，按下時像水滴一樣微微膨脹 */
+        section.attachments-section[data-tm-ap-style="glass"] {
+            color: var(--tm-ap-text) !important;
+        }
+        section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl] {
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            min-height: 0 !important;
+            padding: 8px 16px !important;
+            border-radius: 999px !important;
+            border: 1px solid var(--tm-ap-edge) !important;
+            background: var(--tm-ap-btn-bg) !important;
+            color: var(--tm-ap-text) !important;
+            font-weight: 600 !important;
+            line-height: 1.4 !important;
+            text-decoration: none !important;
+            box-shadow: inset 0 1px 1px var(--tm-ap-rim), 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+            cursor: pointer !important;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease !important;
+        }
+        section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl] * { color: inherit !important; }
+        section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl]:hover { transform: scale(1.03); filter: brightness(1.06); }
+        section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl]:active { transform: scale(1.06); filter: brightness(1.12); transition-duration: 0.2s !important; }
+        @media (prefers-reduced-motion: reduce) {
+            section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl] { transition: none !important; transform: none !important; }
+        }
+
         /* 5. 拖曳把手：在附件區塊正上方，跟著同一組 X/Y 位置移動 */
         #tm-ap-handle {
             position: fixed;
@@ -186,19 +275,22 @@
             margin: 0;
             padding: 0 4px 0 8px;
             color: inherit;
-            font: 12px/1 -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
-            background: rgba(128, 128, 128, 0.16);
-            -webkit-backdrop-filter: blur(var(--tm-ap-blur, 8px));
-            backdrop-filter: blur(var(--tm-ap-blur, 8px));
-            border: 1px solid rgba(128, 128, 128, 0.3);
+            font: 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
+            background: var(--tm-ap-handle-bg, rgba(128, 128, 128, 0.16));
+            -webkit-backdrop-filter: var(--tm-ap-filter, blur(8px));
+            backdrop-filter: var(--tm-ap-filter, blur(8px));
+            border: var(--tm-ap-border, 1px solid rgba(128, 128, 128, 0.3));
             border-bottom: 0;
-            border-radius: 10px 10px 0 0;
+            border-radius: var(--tm-ap-radius, 10px) var(--tm-ap-radius, 10px) 0 0;
+            box-shadow: var(--tm-ap-handle-shadow, none);
             cursor: grab;
             user-select: none;
             -webkit-user-select: none;
             touch-action: none;
         }
         #tm-ap-handle.is-visible { display: flex; }
+        #tm-ap-handle.is-glass, #tm-ap-preview.is-glass { color: var(--tm-ap-text); }
+        #tm-ap-handle.is-glass { padding-left: 12px; font-weight: 600; }
         #tm-ap-handle.is-dragging { cursor: grabbing; background: rgba(10, 132, 255, 0.22); }
         #tm-ap-handle.is-locked { cursor: default; }
         #tm-ap-handle .tm-ap-grip { padding-right: 4px; opacity: 0.55; }
@@ -224,10 +316,11 @@
             color: inherit;
             font-size: 12px;
             background: var(--tm-ap-bg, transparent);
-            -webkit-backdrop-filter: blur(var(--tm-ap-blur, 8px));
-            backdrop-filter: blur(var(--tm-ap-blur, 8px));
-            border: 1px dashed rgba(128, 128, 128, 0.55);
-            border-radius: 0 0 10px 10px;
+            -webkit-backdrop-filter: var(--tm-ap-filter, blur(8px));
+            backdrop-filter: var(--tm-ap-filter, blur(8px));
+            border: var(--tm-ap-border, 1px solid rgba(128, 128, 128, 0.3));
+            border-radius: 0 0 var(--tm-ap-radius, 10px) var(--tm-ap-radius, 10px);
+            box-shadow: var(--tm-ap-shadow, none);
         }
 
         /* 6. 設定面板（畫面正中央）：液態玻璃風格，與 x1080-attachment-extract 的設定面板一致 */
@@ -241,6 +334,7 @@
             --tm-divider: rgba(0, 0, 0, 0.08);
             --tm-mini: rgba(255, 255, 255, 0.35);
             --tm-track: rgba(120, 120, 128, 0.2);
+            --tm-seg-on: #ffffff;
             position: fixed;
             top: 50%;
             left: 50%;
@@ -269,18 +363,18 @@
                 0 10px 30px rgba(0, 0, 0, 0.18),
                 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-        @media (prefers-color-scheme: dark) {
-            #tm-ap-settings {
-                --tm-sheet: rgba(28, 28, 32, 0.85);
-                --tm-solid: rgb(44, 44, 46);
-                --tm-text: #f5f5f7;
-                --tm-sub: rgba(245, 245, 247, 0.6);
-                --tm-rim: rgba(255, 255, 255, 0.5);
-                --tm-edge: rgba(255, 255, 255, 0.18);
-                --tm-divider: rgba(255, 255, 255, 0.12);
-                --tm-mini: rgba(255, 255, 255, 0.12);
-                --tm-track: rgba(120, 120, 128, 0.36);
-            }
+        /* 深色：跟著「玻璃深淺」設定（經典風格時跟著系統） */
+        #tm-ap-settings.is-dark {
+            --tm-sheet: rgba(28, 28, 32, 0.85);
+            --tm-solid: rgb(44, 44, 46);
+            --tm-text: #f5f5f7;
+            --tm-sub: rgba(245, 245, 247, 0.6);
+            --tm-rim: rgba(255, 255, 255, 0.5);
+            --tm-edge: rgba(255, 255, 255, 0.18);
+            --tm-divider: rgba(255, 255, 255, 0.12);
+            --tm-mini: rgba(255, 255, 255, 0.12);
+            --tm-track: rgba(120, 120, 128, 0.36);
+            --tm-seg-on: rgba(99, 99, 102, 0.95);
         }
         #tm-ap-settings .tm-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; font-weight: 600; }
         #tm-ap-settings .tm-btns { display: flex; gap: 6px; }
@@ -389,6 +483,25 @@
         #tm-ap-settings .tm-switch:checked { background: ${ACCENT}; }
         #tm-ap-settings .tm-switch:checked::after { transform: translateX(18px); }
         #tm-ap-settings .tm-switch:focus-visible { outline: 2px solid rgba(10, 132, 255, 0.6); outline-offset: 2px; }
+        #tm-ap-settings .tm-row.is-hidden { display: none; }
+        #tm-ap-settings .tm-seg { display: inline-flex; flex: none; padding: 2px; border-radius: 9px; background: var(--tm-track); }
+        #tm-ap-settings .tm-seg button {
+            -webkit-appearance: none;
+            appearance: none;
+            margin: 0;
+            padding: 4px 12px;
+            border: 0;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--tm-text);
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.5;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        #tm-ap-settings .tm-seg button.tm-on { background: var(--tm-seg-on); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
         #tm-ap-settings .tm-hint { margin: 12px 4px 0; font-size: 11px; color: var(--tm-sub); }
 
         @media (prefers-reduced-transparency: reduce) {
@@ -411,23 +524,45 @@
     const VARS_STYLE_ID = 'tm-ap-vars';
     let lastVars = '';
 
-    // 把目前的位置、寬度、背景寫進 :root 變數（直接改 CSSOM，不會觸發 MutationObserver）
+    // 把目前的位置、寬度、外觀寫進 :root 變數（直接改 CSSOM，不會觸發 MutationObserver）
     function applyVars() {
         const style = document.getElementById(VARS_STYLE_ID);
         const rule = style && style.sheet && style.sheet.cssRules[0];
         if (!rule) return;
         const p = layout();
+        const look = appearance();
         const vars = [
             ['--tm-ap-right', p.right + 'px'],
             ['--tm-ap-top', p.top + 'px'],
             ['--tm-ap-w', p.width + 'px'],
-            ['--tm-ap-bg', `rgba(0, 0, 0, ${clamp(Number(settings.bgOpacity) || 0, 0, 1)})`],
-            ['--tm-ap-blur', clamp(Number(settings.blurPx) || 0, 0, 40) + 'px'],
+            ['--tm-ap-bg', look.bg],
+            ['--tm-ap-handle-bg', look.handleBg],
+            ['--tm-ap-filter', look.filter],
+            ['--tm-ap-border', look.border],
+            ['--tm-ap-radius', look.radius],
+            ['--tm-ap-shadow', look.shadow],
+            ['--tm-ap-handle-shadow', look.handleShadow],
+            ['--tm-ap-text', look.text],
+            ['--tm-ap-rim', look.rim],
+            ['--tm-ap-edge', look.edge],
+            ['--tm-ap-btn-bg', look.btnBg],
         ];
         const key = vars.map(v => v[1]).join('|');
         if (key === lastVars && rule.style.getPropertyValue('--tm-ap-top')) return;
         lastVars = key;
         for (const [name, value] of vars) rule.style.setProperty(name, value);
+    }
+
+    // 把目前風格（液態玻璃／經典）標記到附件區塊、把手、預覽框，並讓設定面板跟著深淺
+    function applyMode() {
+        const style = settings.panelStyle;
+        const glass = style === 'glass';
+        document.querySelectorAll('section.attachments-section').forEach(sec => {
+            if (sec.dataset.tmApStyle !== style) sec.dataset.tmApStyle = style;
+        });
+        if (handle) handle.classList.toggle('is-glass', glass);
+        document.getElementById('tm-ap-preview')?.classList.toggle('is-glass', glass);
+        document.getElementById(SETTINGS_ID)?.classList.toggle('is-dark', isDark());
     }
 
     // 放入樣式表（若被網站換頁時移除，下次檢查會補回）
@@ -577,7 +712,10 @@
 
     // ===== 設定面板 =====
     // scale：面板上顯示的數字 = 儲存的值 × scale（例如不透明度存 0.2、顯示 20%）
+    // when：只在符合條件時顯示這一列（液態玻璃與經典各自的選項）
     const SETTINGS_ID = 'tm-ap-settings';
+    const isGlass = () => settings.panelStyle === 'glass';
+    const isClassic = () => settings.panelStyle === 'classic';
     const SETTING_FIELDS = [
         { section: '位置（也可以直接拖曳附件區塊上方的把手）' },
         { key: 'panelRight', label: '水平位置（X 軸，距離右邊）', type: 'range', unit: 'px', min: 0, step: 1, max: () => Math.max(100, layout().maxRight) },
@@ -585,14 +723,18 @@
         { key: 'panelWidth', label: '寬度', type: 'range', unit: 'px', min: WIDTH_MIN, step: 10, max: () => WIDTH_MAX },
         { key: 'lockPosition', label: '鎖定位置（不能拖曳）', type: 'switch' },
         { section: '外觀' },
-        { key: 'bgOpacity', label: '背景不透明度', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100 },
-        { key: 'blurPx', label: '毛玻璃模糊', type: 'range', unit: 'px', min: 0, step: 1, max: () => 20 },
+        { key: 'panelStyle', label: '風格', type: 'seg', options: [['glass', '液態玻璃'], ['classic', '經典']] },
+        { key: 'glassOpacity', label: '玻璃不透明度', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100, when: isGlass },
+        { key: 'glassTheme', label: '玻璃深淺', type: 'seg', options: [['auto', '自動'], ['light', '淺色'], ['dark', '深色']], when: isGlass },
+        { key: 'bgOpacity', label: '背景不透明度', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100, when: isClassic },
+        { key: 'blurPx', label: '毛玻璃模糊', type: 'range', unit: 'px', min: 0, step: 1, max: () => 20, when: isClassic },
     ];
 
     function setSetting(key, value) {
         settings[key] = value;
         saveSettings();
         applyVars();
+        applyMode();
         refreshHandle();
         refreshSettingsUI();
     }
@@ -608,6 +750,21 @@
             sw.dataset.k = f.key;
             sw.onchange = () => setSetting(f.key, sw.checked);
             row.append(label, sw);
+            return row;
+        }
+
+        if (f.type === 'seg') {
+            const row = el('div', 'tm-row');
+            const seg = el('div', 'tm-seg');
+            seg.dataset.k = f.key;
+            for (const [value, text] of f.options) {
+                const b = el('button', '', text);
+                b.type = 'button';
+                b.dataset.v = value;
+                b.onclick = () => setSetting(f.key, value);
+                seg.appendChild(b);
+            }
+            row.append(label, seg);
             return row;
         }
 
@@ -643,14 +800,20 @@
     function refreshSettingsUI() {
         const sp = document.getElementById(SETTINGS_ID);
         if (!sp) return;
+        sp.classList.toggle('is-dark', isDark());
         const p = layout();
         const shown = { panelRight: p.right, panelTop: p.top, panelWidth: p.width };
         for (const f of SETTING_FIELDS) {
             if (!f.key) continue;
+            sp.querySelector(`[data-row="${f.key}"]`).classList.toggle('is-hidden', !!f.when && !f.when());
             const stored = f.key in shown ? shown[f.key] : settings[f.key];
 
             if (f.type === 'switch') {
                 sp.querySelector(`.tm-switch[data-k="${f.key}"]`).checked = !!stored;
+                continue;
+            }
+            if (f.type === 'seg') {
+                sp.querySelectorAll(`.tm-seg[data-k="${f.key}"] button`).forEach(b => b.classList.toggle('tm-on', b.dataset.v === stored));
                 continue;
             }
 
@@ -689,6 +852,7 @@
             settings = Object.assign({}, DEFAULTS);
             saveSettings();
             applyVars();
+            applyMode();
             refreshHandle();
             refreshSettingsUI();
         };
@@ -708,9 +872,11 @@
                 sp.appendChild(group);
                 continue;
             }
-            group.appendChild(buildSettingRow(f));
+            const row = buildSettingRow(f);
+            row.dataset.row = f.key;
+            group.appendChild(row);
         }
-        sp.appendChild(el('div', 'tm-hint', '調整後立即生效並自動儲存，腳本更新也會保留。拖曳把手可直接移動，↺ 恢復預設位置；在把手上按右鍵、按 ⚙️，或從 Tampermonkey 選單都能開啟這裡；按 Esc 關閉。'));
+        sp.appendChild(el('div', 'tm-hint', '調整後立即生效並自動儲存，腳本更新也會保留。液態玻璃的字看不清楚就調高不透明度，或把深淺改成跟網站一樣。拖曳把手可直接移動，↺ 恢復預設位置；在把手上按右鍵、按 ⚙️，或從 Tampermonkey 選單都能開啟這裡；按 Esc 關閉。'));
         sp.addEventListener('keydown', (e) => e.stopPropagation());   // 避免在數字框打字時觸發網站的快捷鍵
 
         document.body.appendChild(sp);
@@ -749,14 +915,15 @@
                 set('width', 'var(--tm-ap-w, 280px)');
                 set('max-height', `max(120px, calc(100vh - var(--tm-ap-top, 260px) - ${HANDLE_H + 20}px))`);
                 set('overflow-y', 'auto');
+                set('overflow-x', 'hidden');
                 set('z-index', '999999');
                 set('background', 'var(--tm-ap-bg, transparent)');
-                set('backdrop-filter', 'blur(var(--tm-ap-blur, 8px))');
-                set('-webkit-backdrop-filter', 'blur(var(--tm-ap-blur, 8px))');
-                set('border', '1px solid rgba(128, 128, 128, 0.3)');
+                set('backdrop-filter', 'var(--tm-ap-filter, blur(8px))');
+                set('-webkit-backdrop-filter', 'var(--tm-ap-filter, blur(8px))');
+                set('border', 'var(--tm-ap-border, 1px solid rgba(128, 128, 128, 0.3))');
                 set('padding', '14px');
-                set('border-radius', '0 0 10px 10px');
-                set('box-shadow', 'none');
+                set('border-radius', '0 0 var(--tm-ap-radius, 10px) var(--tm-ap-radius, 10px)');
+                set('box-shadow', 'var(--tm-ap-shadow, none)');
                 set('display', 'flex');
                 set('flex-direction', 'column');
             }
@@ -768,6 +935,7 @@
                 const text = (btn.textContent || '').trim();
                 if (!text.includes('下載') && !text.includes('下载') && btn.tagName !== 'BUTTON') return;
                 if (btn.classList.contains('file-more')) return;
+                if (btn.dataset.tmApDl !== '1') btn.dataset.tmApDl = '1';   // 液態玻璃風格用來套用玻璃按鈕樣式
 
                 // 設定按鈕本身填滿底部一整行並置中
                 btn.style.setProperty('order', '999', 'important');
@@ -807,6 +975,7 @@
         });
 
         updateHandle(sectionVisible);
+        applyMode();
     }
 
     applyFix();
@@ -816,6 +985,14 @@
         applyVars();
         refreshSettingsUI();
     });
+    // 系統切換淺色 / 深色、或「減少透明度」時，玻璃跟著變
+    const onSystemLook = () => {
+        applyVars();
+        applyMode();
+        refreshSettingsUI();
+    };
+    mqDark.addEventListener('change', onSystemLook);
+    mqSolid.addEventListener('change', onSystemLook);
 
     // 只有網頁本身的變動才重新套用；把手、設定面板、預覽框自己的變動（例如拖曳時更新座標文字）略過
     // 觀察 document 而不是 documentElement：document-start 時 <html> 有可能還沒建立

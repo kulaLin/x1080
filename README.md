@@ -20,7 +20,7 @@ Tampermonkey userscripts for 1080xin (x1080x).
 |---|---|---|---|
 | [x1080] 下載｜磁力連結面板＋Notion<br>(Download · Magnet panel + Notion) | [x1080-magnet-notion](#x1080-magnet-notion) | Right-side "download links" panel on posts in BT綜合區 (BT board) and LTX無碼破解BT區 (LTX BT board): copy magnet links, send them to Notion in one click (with timestamps on the sub-page), then auto-close the tab; with the companion extension it jumps to the next tab right away | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-magnet-notion.user.js) |
 | [x1080] 下載｜附件連結一鍵提取<br>(Download · One-click attachment link extractor) | [x1080-attachment-extract](#x1080-attachment-extract) | Clicks every "download by count" attachment button, intercepts the real download URLs and tokens, then auto-closes the tab | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-extract.user.js) |
-| [x1080] 版面｜附件區塊右側懸浮<br>(Layout · Floating attachment panel) | [x1080-attachment-panel](#x1080-attachment-panel) | Turns the attachment section into a floating, vertical, transparent panel on the right, with the download button at the bottom; drag to move, settings panel for position and look | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
+| [x1080] 版面｜附件區塊右側懸浮<br>(Layout · Floating attachment panel) | [x1080-attachment-panel](#x1080-attachment-panel) | Turns the attachment section into a floating, vertical panel on the right, with the download button at the bottom; drag to move, iOS 27 Liquid Glass or classic transparent style | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-attachment-panel.user.js) |
 | [x1080] 版面｜精簡（隱藏數據／簽名檔／回覆區）<br>(Layout · Clean-up: hide stats / signature / replies) | [x1080-clean-layout](#x1080-clean-layout) | Hides the stats under the title, signature ads, the action bar and the reply area | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-clean-layout.user.js) |
 | [x1080] 瀏覽｜已開連結標記<br>(Browse · Visited-link marker) | [x1080-visited-marker](#x1080-visited-marker) | Keeps its own record of opened links and dims them with a ✓, without relying on the browser's `:visited` (works with Linkclump bulk opening) | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-visited-marker.user.js) |
 | [x1080] 瀏覽｜板塊新文章通知<br>(Browse · New-post notifier for boards) | [x1080-board-watch](#x1080-board-watch) | Checks watched boards on a schedule and notifies new posts via Telegram and desktop notifications | [Install](https://raw.githubusercontent.com/kulaLin/x1080/main/x1080-board-watch.user.js) |
@@ -201,13 +201,16 @@ File: `x1080-attachment-panel.user.js` (Tampermonkey name: [x1080] 版面｜附�
 
 > Known conflict: overlaps the right-side panel of x1080-magnet-notion — see "Known conflict between scripts" above.
 
-Pins the post's attachment section (`section.attachments-section`) to the right side of the screen, arranged vertically with a transparent background. The site's own download buttons are kept intact, just moved to the bottom.
+Pins the post's attachment section (`section.attachments-section`) to the right side of the screen, arranged vertically, in either the iOS 27 Liquid Glass style or the classic transparent frosted-glass style. The site's own download buttons are kept intact, just moved to the bottom.
 
 ### Features
 
 - The attachment section floats on the right (280px wide by default) and scrolls inside itself when too long
 - A drag handle sits on top of the panel: hold and drag to move it anywhere (X/Y axes); the handle shows live coordinates while dragging and the position is saved on release. In a smaller window it is pulled back inside the screen, and it returns to its saved spot on a larger one
 - The handle's ↺ restores the default position and ⚙️ opens the settings panel; the position can be locked in settings to avoid accidental drags
+- Two switchable styles:
+  - **Liquid Glass** (default): the same iOS 27 Liquid Glass look as x1080-attachment-extract — translucent blur, boosted saturation and edge highlights; the handle and panel join into one sheet of glass, and the download button becomes a clear glass pill that swells slightly when pressed. The glass tone follows the system light/dark mode or can be fixed to light or dark; it turns opaque when the system's Reduce Transparency setting is on
+  - **Classic**: the transparent background with frosted glass used up to v4.7
 - All inner containers become a single vertical column; file names show in full instead of being squeezed into a narrow strip
 - The 「按次數下載／下載」 (download) button moves to the bottom of the panel and fills the full width
 - Hides the 「各身份價格」 (price per member level) button and the price-tier list (`.price-tiers` — points / free / not eligible per member level), the 「下載說明」 (download help) link and the RAR icon
@@ -223,10 +226,13 @@ Open the settings panel with the **⚙️** on the handle, by **right-clicking**
 | Vertical position (Y) | `260` px from the top | Top edge of the handle; slider or type a number |
 | Width | `280` px | `200`–`600` px |
 | Lock position | Off | On = the handle cannot be dragged |
-| Background opacity | `0%` | `0%` = fully transparent, `20%` = light dark tint |
-| Frosted-glass blur | `8` px | `0` = none, `8` = light frosted glass (keeps background text from distracting) |
+| Style | Liquid Glass | Liquid Glass / Classic; the options below switch with the style |
+| Glass opacity (Liquid Glass) | `30%` | Like the iOS 27 transparency slider: `0%` most transparent, `100%` fully opaque; raise it if text is hard to read |
+| Glass tone (Liquid Glass) | Auto | Auto (follows the system light/dark mode) / Light / Dark; set it to match the site if the site and system differ |
+| Background opacity (Classic) | `0%` | `0%` = fully transparent, `20%` = light dark tint |
+| Frosted-glass blur (Classic) | `8` px | `0` = none, `8` = light frosted glass (keeps background text from distracting) |
 
-> The defaults live in `DEFAULTS` at the top of the script. From v4.7 the script needs the `GM_getValue` / `GM_setValue` / `GM_registerMenuCommand` grants to remember settings; constants such as `TOP_OFFSET` edited in older versions are not carried over, so set them again in the settings panel.
+> The defaults live in `DEFAULTS` at the top of the script. From v4.7 the script needs the `GM_getValue` / `GM_setValue` / `GM_registerMenuCommand` grants to remember settings; constants such as `TOP_OFFSET` edited in older versions are not carried over, so set them again in the settings panel. From v4.8 the default style is Liquid Glass; switch 「風格」 (Style) to 「經典」 (Classic) in settings for the previous look.
 
 ---
 
