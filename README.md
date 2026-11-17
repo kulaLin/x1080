@@ -240,7 +240,7 @@ Open the settings panel with the **⚙️** on the handle, by **right-clicking**
 
 File: `x1080-visited-marker.user.js` (Tampermonkey name: [x1080] 瀏覽｜已開連結標記)
 
-Instead of asking the browser whether a link was visited, each page records its own URL in the script's storage when it loads, and list pages compare their links against that record — matches are dimmed, their row is shaded, and they get a ✓ (no ✓ on board list pages, `/boards/`). It is therefore unaffected by Chromium's `:visited` partitioning, and tabs opened in bulk with Linkclump, middle-click or Ctrl+click are marked too.
+Instead of asking the browser whether a link was visited, each page records its own URL in the script's storage when it loads, and list pages compare their links against that record — matches are dimmed and get a ✓ (no ✓ on board list pages, `/boards/`). It is therefore unaffected by Chromium's `:visited` partitioning, and tabs opened in bulk with Linkclump, middle-click or Ctrl+click are marked too.
 
 Domains: 1080xin.com and agaghhh.cc (old domain; records are shared).
 
@@ -255,15 +255,13 @@ Domains: 1080xin.com and agaghhh.cc (old domain; records are shared).
 
 ### Tampermonkey menu
 
-Toggle mark display, adjust row shade, mark all links on this page as visited, export records, import records (merged with existing), clear all records, show this page's match key (debugging), re-run old-domain record conversion.
+Toggle mark display, mark all links on this page as visited, export records, import records (merged with existing), clear all records, show this page's match key (debugging), re-run old-domain record conversion.
 
 ### Settings
 
-The `CONFIG` object at the top of the script controls the mark appearance (opacity, colour, ✓ badge and the pages that skip it via `NO_BADGE_PATHS`, default row-shade strength and colour via `ROW_SHADE_*`), URL normalisation rules (`DROP_PARAMS`, etc.), recording rules and the record limit (20,000 by default).
+The `CONFIG` object at the top of the script controls the mark appearance (opacity, colour, ✓ badge and the pages that skip it via `NO_BADGE_PATHS`, row dimming), URL normalisation rules (`DROP_PARAMS`, etc.), recording rules and the record limit (20,000 by default).
 
 > Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
-
-> Row shade needs no file edit: the menu's *adjust row shade* opens a slider (0–40%, 0% = no shade) with live preview; *Save* applies it to all tabs. It is kept in the script's storage, so auto-updates don't reset it.
 
 > Records are stored in this script's Tampermonkey storage. If an install from GitHub is treated as a new script rather than an update (for example after `@name` or `@namespace` changed), it starts with an empty record — use the menu's export first, and import again after installing.
 
