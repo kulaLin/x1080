@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜附件連結一鍵提取
 // @namespace    https://github.com/kulaLin/x1080
-// @version      2.11
+// @version      2.12
 // @description  自動點擊「按次數下載」並攔截真實下載網址與 Token，完成後自動關閉分頁
 // @author       Gemini
 // @match        *://1080xin.com/*
@@ -31,6 +31,161 @@
     const BUTTON_TOP = 'calc(35vh - 10px)';
     // 攔截面板 / 收合小按鈕的位置 = 一鍵提取按鈕下方 60px（固定換算，不用改）
     const PANEL_TOP = `calc(${BUTTON_TOP} + 60px)`;
+    // 設定：液態玻璃的深淺（'auto' = 跟著系統的淺色 / 深色模式；'light' = 永遠淺色玻璃；'dark' = 永遠深色玻璃）
+    const GLASS_THEME = 'auto';
+    // 設定：液態玻璃的不透明度，類似 iOS 27 的透明度滑桿（0 = 最透明，1 = 完全不透明；底下網頁太花、字看不清楚就調高）
+    const GLASS_OPACITY = 0.3;
+
+    // 液態玻璃（Liquid Glass）樣式：半透明底色 + 背景模糊與提高飽和度 + 邊緣光線高光 + 按下時像水滴一樣微微膨脹
+    // 系統開啟「減少透明度」時改成不透明，開啟「減少動態效果」時取消縮放動畫
+    const GLASS_STYLE_ID = 'tm-extract-glass-style';
+    const glassA = Math.min(Math.max(Number(GLASS_OPACITY) || 0, 0), 1);
+    const alpha = (min) => (min + glassA * (1 - min)).toFixed(2);   // 把 0~1 的設定換算成各元素實際的透明度
+    const GLASS_ROOT = '#tm-float-extract-btn, #tm-extract-toggle, #tm-extract-panel';
+    const GLASS_SHEEN = 'linear-gradient(160deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 62%, rgba(255,255,255,0.14) 100%)';
+    const GLASS_DARK_VARS = `
+            --tm-fill: rgba(28, 28, 32, ${alpha(0.3)});
+            --tm-solid: rgb(44, 44, 46);
+            --tm-text: #f5f5f7;
+            --tm-sub: rgba(245, 245, 247, 0.6);
+            --tm-rim: rgba(255, 255, 255, 0.5);
+            --tm-edge: rgba(255, 255, 255, 0.18);
+            --tm-divider: rgba(255, 255, 255, 0.12);
+            --tm-mini: rgba(255, 255, 255, 0.12);
+            --tm-link: #30d158;
+            --tm-token: #ff9f0a;`;
+    const GLASS_DARK_BLOCK = GLASS_THEME === 'dark' ? `${GLASS_ROOT} {${GLASS_DARK_VARS}\n        }`
+        : GLASS_THEME === 'light' ? ''
+        : `@media (prefers-color-scheme: dark) {\n        ${GLASS_ROOT} {${GLASS_DARK_VARS}\n        }\n        }`;
+    const GLASS_CSS = `
+        ${GLASS_ROOT} {
+            --tm-fill: rgba(255, 255, 255, ${alpha(0.12)});
+            --tm-solid: rgb(242, 242, 247);
+            --tm-text: #1d1d1f;
+            --tm-sub: rgba(29, 29, 31, 0.55);
+            --tm-rim: rgba(255, 255, 255, 0.9);
+            --tm-edge: rgba(255, 255, 255, 0.45);
+            --tm-divider: rgba(0, 0, 0, 0.08);
+            --tm-mini: rgba(255, 255, 255, 0.35);
+            --tm-link: #1a7f37;
+            --tm-token: #b54708;
+            position: fixed;
+            right: 20px;
+            z-index: 2147483647;
+            box-sizing: border-box;
+            margin: 0;
+            color: var(--tm-text);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
+            background: ${GLASS_SHEEN}, var(--tm-fill);
+            -webkit-backdrop-filter: blur(12px) saturate(190%) brightness(1.05);
+            backdrop-filter: blur(12px) saturate(190%) brightness(1.05);
+            border: 1px solid var(--tm-edge);
+            box-shadow:
+                inset 0 1px 1px var(--tm-rim),
+                inset 0 -1px 1px rgba(255, 255, 255, 0.2),
+                inset 0 0 18px rgba(255, 255, 255, 0.12),
+                0 10px 30px rgba(0, 0, 0, 0.18),
+                0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+        }
+        ${GLASS_DARK_BLOCK}
+        /* 邊緣的光線高光：左上與右下較亮，像光線打在玻璃邊緣 */
+        #tm-float-extract-btn::before, #tm-extract-toggle::before, #tm-extract-panel::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            padding: 1.5px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.2) 28%, rgba(255,255,255,0) 50%, rgba(255,255,255,0.2) 72%, rgba(255,255,255,0.75));
+            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+        #tm-float-extract-btn, #tm-extract-toggle {
+            -webkit-appearance: none;
+            appearance: none;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 600;
+            line-height: 1.4;
+            white-space: nowrap;
+            text-transform: none;
+            min-height: 0;
+        }
+        #tm-float-extract-btn {
+            top: ${BUTTON_TOP};
+            padding: 12px 22px;
+            font-size: 15px;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            background: ${GLASS_SHEEN}, rgba(36, 160, 72, ${alpha(0.6)});
+        }
+        #tm-extract-toggle {
+            top: ${PANEL_TOP};
+            padding: 7px 16px;
+            font-size: 13px;
+        }
+        #tm-float-extract-btn:hover, #tm-extract-toggle:hover { transform: scale(1.04); filter: brightness(1.06); }
+        #tm-float-extract-btn:active, #tm-extract-toggle:active { transform: scale(1.09); filter: brightness(1.12); transition-duration: 0.2s; }
+        #tm-float-extract-btn:focus-visible, #tm-extract-toggle:focus-visible { outline: 2px solid rgba(10, 132, 255, 0.7); outline-offset: 3px; }
+        #tm-extract-panel {
+            top: ${PANEL_TOP};
+            width: 480px;
+            max-width: 90vw;
+            padding: 12px 16px;
+            border-radius: 22px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        #tm-extract-panel .tm-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+        #tm-extract-panel .tm-btns { display: flex; gap: 6px; }
+        #tm-extract-panel .tm-mini {
+            -webkit-appearance: none;
+            appearance: none;
+            margin: 0;
+            padding: 4px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--tm-edge);
+            background: var(--tm-mini);
+            color: var(--tm-text);
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.5;
+            cursor: pointer;
+            box-shadow: inset 0 1px 1px var(--tm-rim), 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
+        }
+        #tm-extract-panel .tm-mini.tm-primary { background: rgba(10, 132, 255, ${alpha(0.7)}); color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2); }
+        #tm-extract-panel .tm-mini:hover { transform: scale(1.06); filter: brightness(1.06); }
+        #tm-extract-panel .tm-mini:active { transform: scale(1.12); }
+        #tm-extract-list {
+            word-break: break-all;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            max-height: min(250px, calc(100vh - ${PANEL_TOP} - 90px));
+            overflow-y: auto;
+        }
+        #tm-extract-list .tm-item { padding: 6px 0; border-top: 1px solid var(--tm-divider); }
+        #tm-extract-list .tm-label { color: var(--tm-sub); }
+        #tm-extract-list .tm-link { color: var(--tm-link); text-decoration: underline; }
+        #tm-extract-list .tm-token { color: var(--tm-token); }
+        @media (prefers-reduced-transparency: reduce) {
+            ${GLASS_ROOT} { --tm-fill: var(--tm-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            ${GLASS_ROOT}, #tm-extract-panel .tm-mini { transition: none !important; transform: none !important; }
+        }
+    `;
+
+    // 把液態玻璃樣式放進網頁（只放一次；若被網站換頁時移除，下次檢查會補回）
+    function ensureGlassStyle() {
+        if (document.getElementById(GLASS_STYLE_ID)) return;
+        const style = document.createElement('style');
+        style.id = GLASS_STYLE_ID;
+        style.textContent = GLASS_CSS;
+        (document.head || document.documentElement).appendChild(style);
+    }
 
     // 有 @grant 時腳本跑在沙盒裡，要攔截網頁本身的函式得透過 unsafeWindow
     const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
@@ -53,19 +208,20 @@
         if (!content || extractedLinks.has(content)) return;
         extractedLinks.add(content);
 
+        ensureGlassStyle();
         let panel = document.getElementById('tm-extract-panel');
         if (!panel) {
             panel = document.createElement('div');
             panel.id = 'tm-extract-panel';
-            panel.style.cssText = 'position: fixed; top: ' + PANEL_TOP + '; right: 20px; width: 480px; max-width: 90vw; max-height: calc(100vh - ' + PANEL_TOP + ' - 20px); overflow-y: auto; box-sizing: border-box; padding: 12px 16px; background: #1e293b; color: #f8fafc; border-radius: 8px; font-size: 13px; line-height: 1.6; border: 2px solid #38bdf8; box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 2147483647;';
 
             const titleBar = document.createElement('div');
-            titleBar.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; color: #38bdf8;';
+            titleBar.className = 'tm-title';
             titleBar.innerHTML = '<span>🎯 已攔截的下載資訊</span>';
 
             const copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'tm-mini tm-primary';
             copyBtn.textContent = '📋 複製全部';
-            copyBtn.style.cssText = 'padding: 4px 10px; background: #0284c7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;';
             copyBtn.onclick = () => {
                 navigator.clipboard.writeText(Array.from(extractedLinks).join('\n'));
                 copyBtn.textContent = '✅ 已複製！';
@@ -73,13 +229,14 @@
             };
 
             const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'tm-mini';
             closeBtn.textContent = '✕';
             closeBtn.title = '收合';
-            closeBtn.style.cssText = 'padding: 4px 10px; background: #334155; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;';
             closeBtn.onclick = () => setPanelVisible(false);
 
             const btnGroup = document.createElement('div');
-            btnGroup.style.cssText = 'display: flex; gap: 6px;';
+            btnGroup.className = 'tm-btns';
             btnGroup.append(copyBtn, closeBtn);
 
             titleBar.appendChild(btnGroup);
@@ -87,7 +244,6 @@
 
             const list = document.createElement('div');
             list.id = 'tm-extract-list';
-            list.style.cssText = 'word-break: break-all; font-family: monospace; max-height: 250px; overflow-y: auto;';
             panel.appendChild(list);
 
             document.body.appendChild(panel);
@@ -96,7 +252,6 @@
             const toggle = document.createElement('button');
             toggle.id = 'tm-extract-toggle';
             toggle.type = 'button';
-            toggle.style.cssText = 'position: fixed; top: ' + PANEL_TOP + '; right: 20px; padding: 6px 14px; background: #1e293b; color: #38bdf8; border: 2px solid #38bdf8; border-radius: 50px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 2147483647;';
             toggle.onclick = () => setPanelVisible(true);
             document.body.appendChild(toggle);
 
@@ -105,13 +260,13 @@
 
         const list = document.getElementById('tm-extract-list');
         const item = document.createElement('div');
-        item.style.cssText = 'padding: 6px 0; border-top: 1px dashed #334155;';
+        item.className = 'tm-item';
 
         if (content.startsWith('http') || content.startsWith('/')) {
             const fullUrl = content.startsWith('/') ? location.origin + content : content;
-            item.innerHTML = `<span style="color:#94a3b8;">[${label}]</span> <a href="${fullUrl}" target="_blank" style="color:#4ade80; text-decoration:underline;">${fullUrl}</a>`;
+            item.innerHTML = `<span class="tm-label">[${label}]</span> <a class="tm-link" href="${fullUrl}" target="_blank">${fullUrl}</a>`;
         } else {
-            item.innerHTML = `<span style="color:#94a3b8;">[${label}]</span> <span style="color:#fbbf24;">${content}</span>`;
+            item.innerHTML = `<span class="tm-label">[${label}]</span> <span class="tm-token">${content}</span>`;
         }
         list.appendChild(item);
 
@@ -191,6 +346,7 @@
     //   - 查不到下載按鈕時移除懸浮按鈕；網址（location.pathname）改變時重置 extractedLinks、tokenCount 與攔截面板
     setInterval(() => {
         if (!document.body) return;
+        ensureGlassStyle();
 
         // 尋找頁面上是否有附件或「按次數下載」按鈕
         const dlButtons = Array.from(document.querySelectorAll('article.attachment .file-get button, button')).filter(
@@ -203,7 +359,6 @@
             floatBtn = document.createElement('button');
             floatBtn.id = 'tm-float-extract-btn';
             floatBtn.type = 'button';
-            floatBtn.style.cssText = 'position: fixed !important; top: ' + BUTTON_TOP + ' !important; right: 20px !important; z-index: 2147483647 !important; padding: 12px 20px !important; background: #10b981 !important; color: #ffffff !important; border: 2px solid #ffffff !important; border-radius: 50px !important; cursor: pointer !important; font-weight: bold !important; font-size: 15px !important; box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;';
 
             const resetFloatBtn = () => {
                 floatBtn.textContent = `⚡ 一鍵提取下載連結 (${dlButtons.length})`;

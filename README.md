@@ -149,6 +149,7 @@ When the page has 「按次數下載」 (download by count) buttons, a 「⚡ �
 - Intercepts the site's download API responses to capture the real download URLs and download tokens, shown in a panel directly below the extract button (collapsed by default into a 「🎯 已攔截 N 筆」 / "N intercepted" button) with a copy-all button
 - Closes the tab automatically once every attachment has a download token; press the button again during the countdown to cancel
 - If some attachments are still not done after 20 seconds, the tab is not closed and the button shows how many finished
+- Buttons and panel use Apple's Liquid Glass look: translucent blur, edge highlights and a slight swell when pressed; follows the system light/dark mode and turns opaque when the system's Reduce Transparency setting is on
 
 ### Settings (constants at the top of the script)
 
@@ -160,6 +161,8 @@ When the page has 「按次數下載」 (download by count) buttons, a 「⚡ �
 | `CLOSE_DELAY_MS` | `100` | Milliseconds to wait before closing after everything is done |
 | `WAIT_TIMEOUT_MS` | `20000` | Maximum milliseconds to wait for all attachments; on timeout the tab is not closed |
 | `BUTTON_TOP` | `'calc(35vh - 10px)'` | Distance of the extract button from the top of the screen (`35vh` = 35% of the screen height, `- 10px` = 10 pixels higher; smaller = higher); the intercept panel follows below it |
+| `GLASS_THEME` | `'auto'` | Liquid Glass tone: `'auto'` follows the system light/dark mode, `'light'` always light, `'dark'` always dark |
+| `GLASS_OPACITY` | `0.3` | Liquid Glass opacity, like the iOS 27 transparency slider (`0` = most transparent, `1` = fully opaque; raise it if text is hard to read) |
 
 > Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
 
