@@ -141,12 +141,12 @@ The extension does not update automatically. When the repo has a new version, ov
 
 File: `x1080-attachment-extract.user.js` (Tampermonkey name: [x1080] 下載｜附件連結一鍵提取)
 
-When the page has 「按次數下載」 (download by count) buttons, a 「⚡ 一鍵提取下載連結 (N)」 (one-click extract download links) button appears at the bottom right.
+When the page has 「按次數下載」 (download by count) buttons, a 「⚡ 一鍵提取下載連結 (N)」 (one-click extract download links) button appears on the right edge of the screen, a little above the middle.
 
 ### Features
 
 - Clicks every 「按次數下載」 button on the page in turn (1.5 seconds apart)
-- Intercepts the site's download API responses to capture the real download URLs and download tokens, shown in a bottom-right panel (collapsed by default into a 「🎯 已攔截 N 筆」 / "N intercepted" button) with a copy-all button
+- Intercepts the site's download API responses to capture the real download URLs and download tokens, shown in a panel directly below the extract button (collapsed by default into a 「🎯 已攔截 N 筆」 / "N intercepted" button) with a copy-all button
 - Closes the tab automatically once every attachment has a download token; press the button again during the countdown to cancel
 - If some attachments are still not done after 20 seconds, the tab is not closed and the button shows how many finished
 
@@ -159,6 +159,7 @@ When the page has 「按次數下載」 (download by count) buttons, a 「⚡ �
 | `AUTO_CLOSE_TAB` | `true` | Close the tab when done |
 | `CLOSE_DELAY_MS` | `100` | Milliseconds to wait before closing after everything is done |
 | `WAIT_TIMEOUT_MS` | `20000` | Maximum milliseconds to wait for all attachments; on timeout the tab is not closed |
+| `BUTTON_TOP` | `'35vh'` | Distance of the extract button from the top of the screen (`35vh` = 35% of the screen height; smaller = higher); the intercept panel follows below it |
 
 > Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜附件連結一鍵提取
 // @namespace    https://github.com/kulaLin/x1080
-// @version      2.9
+// @version      2.10
 // @description  自動點擊「按次數下載」並攔截真實下載網址與 Token，完成後自動關閉分頁
 // @author       Gemini
 // @match        *://1080xin.com/*
@@ -27,6 +27,10 @@
     const CLOSE_DELAY_MS = 100;
     // 設定：最多等幾毫秒讓所有附件完成；超時代表有附件沒成功，就不自動關閉
     const WAIT_TIMEOUT_MS = 20000;
+    // 設定：一鍵提取按鈕距離畫面頂端多遠（35vh = 畫面高度的 35%，數字越小越上面；攔截面板會自動跟在按鈕下方）
+    const BUTTON_TOP = '35vh';
+    // 攔截面板 / 收合小按鈕的位置 = 一鍵提取按鈕下方 60px（固定換算，不用改）
+    const PANEL_TOP = `calc(${BUTTON_TOP} + 60px)`;
 
     // 有 @grant 時腳本跑在沙盒裡，要攔截網頁本身的函式得透過 unsafeWindow
     const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
@@ -53,7 +57,7 @@
         if (!panel) {
             panel = document.createElement('div');
             panel.id = 'tm-extract-panel';
-            panel.style.cssText = 'position: fixed; bottom: 75px; right: 20px; width: 480px; max-width: 90vw; padding: 12px 16px; background: #1e293b; color: #f8fafc; border-radius: 8px; font-size: 13px; line-height: 1.6; border: 2px solid #38bdf8; box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 2147483647;';
+            panel.style.cssText = 'position: fixed; top: ' + PANEL_TOP + '; right: 20px; width: 480px; max-width: 90vw; max-height: calc(100vh - ' + PANEL_TOP + ' - 20px); overflow-y: auto; box-sizing: border-box; padding: 12px 16px; background: #1e293b; color: #f8fafc; border-radius: 8px; font-size: 13px; line-height: 1.6; border: 2px solid #38bdf8; box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 2147483647;';
 
             const titleBar = document.createElement('div');
             titleBar.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; color: #38bdf8;';
@@ -92,7 +96,7 @@
             const toggle = document.createElement('button');
             toggle.id = 'tm-extract-toggle';
             toggle.type = 'button';
-            toggle.style.cssText = 'position: fixed; bottom: 75px; right: 20px; padding: 6px 14px; background: #1e293b; color: #38bdf8; border: 2px solid #38bdf8; border-radius: 50px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 2147483647;';
+            toggle.style.cssText = 'position: fixed; top: ' + PANEL_TOP + '; right: 20px; padding: 6px 14px; background: #1e293b; color: #38bdf8; border: 2px solid #38bdf8; border-radius: 50px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 2147483647;';
             toggle.onclick = () => setPanelVisible(true);
             document.body.appendChild(toggle);
 
@@ -199,7 +203,7 @@
             floatBtn = document.createElement('button');
             floatBtn.id = 'tm-float-extract-btn';
             floatBtn.type = 'button';
-            floatBtn.style.cssText = 'position: fixed !important; bottom: 20px !important; right: 20px !important; z-index: 2147483647 !important; padding: 12px 20px !important; background: #10b981 !important; color: #ffffff !important; border: 2px solid #ffffff !important; border-radius: 50px !important; cursor: pointer !important; font-weight: bold !important; font-size: 15px !important; box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;';
+            floatBtn.style.cssText = 'position: fixed !important; top: ' + BUTTON_TOP + ' !important; right: 20px !important; z-index: 2147483647 !important; padding: 12px 20px !important; background: #10b981 !important; color: #ffffff !important; border: 2px solid #ffffff !important; border-radius: 50px !important; cursor: pointer !important; font-weight: bold !important; font-size: 15px !important; box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;';
 
             const resetFloatBtn = () => {
                 floatBtn.textContent = `⚡ 一鍵提取下載連結 (${dlButtons.length})`;
