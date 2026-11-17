@@ -151,20 +151,23 @@ When the page has 「按次數下載」 (download by count) buttons, a 「⚡ �
 - If some attachments are still not done after 20 seconds, the tab is not closed and the button shows how many finished
 - Buttons and panel use Apple's Liquid Glass look: translucent blur, edge highlights and a slight swell when pressed; follows the system light/dark mode and turns opaque when the system's Reduce Transparency setting is on
 
-### Settings (constants at the top of the script)
+### Settings panel
 
-| Constant | Default | Description |
+Open the settings panel by **right-clicking** the extract button, the **⚙️** button on the intercept panel, or the Tampermonkey menu item 「⚙️ 一鍵提取設定」. Changes apply immediately and are saved in Tampermonkey, so they survive script auto-updates; 「重設」 (Reset) restores the defaults, and Esc or 「完成」 (Done) closes the panel. On pages without attachments a preview button appears so you can see the position and opacity.
+
+| Setting | Default | Description |
 |---|---|---|
-| `BLOCK_AUTO_DOWNLOAD` | `false` | `true` = only capture URLs, do not let the browser download |
-| `SHOW_PANEL_BY_DEFAULT` | `false` | Show the intercept panel expanded by default |
-| `AUTO_CLOSE_TAB` | `true` | Close the tab when done |
-| `CLOSE_DELAY_MS` | `100` | Milliseconds to wait before closing after everything is done |
-| `WAIT_TIMEOUT_MS` | `20000` | Maximum milliseconds to wait for all attachments; on timeout the tab is not closed |
-| `BUTTON_TOP` | `'calc(35vh - 15px)'` | Distance of the extract button from the top of the screen (`35vh` = 35% of the screen height, `- 15px` = 15 pixels higher; smaller = higher); the intercept panel follows below it |
-| `GLASS_THEME` | `'auto'` | Liquid Glass tone: `'auto'` follows the system light/dark mode, `'light'` always light, `'dark'` always dark |
-| `GLASS_OPACITY` | `0.3` | Liquid Glass opacity, like the iOS 27 transparency slider (`0` = most transparent, `1` = fully opaque; raise it if text is hard to read) |
+| Horizontal position (X) | `20` px from the right | Slider or type a number |
+| Vertical position (Y) | 35% of the screen height, 15 px higher | Slider or type a number; the intercept panel follows below the button |
+| Glass opacity | `30%` | Like the iOS 27 transparency slider: `0%` most transparent, `100%` fully opaque; raise it if text is hard to read |
+| Glass tone | Auto | Auto (follows the system light/dark mode) / Light / Dark |
+| Close the tab when done | On | |
+| Wait before closing the tab | `100` ms | How long to wait after every attachment has started downloading |
+| Maximum wait for attachments | `20` s | On timeout some attachment failed, so the tab is not closed |
+| Show the intercept panel expanded | Off | Off = collapsed into the 「🎯 已攔截 N 筆」 button |
+| Only capture URLs, do not download | Off | On = only intercept URLs, do not let the browser download |
 
-> Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
+> The defaults live in `DEFAULTS` at the top of the script.
 
 ### Known issues (to be fixed)
 
