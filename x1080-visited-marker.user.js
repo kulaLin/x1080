@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 瀏覽｜已開連結標記
 // @namespace    https://github.com/kulaLin/x1080
-// @version      1.2
+// @version      1.4
 // @description  自行記錄開過的連結並標記，完全不依賴瀏覽器 :visited，可解決 Chromium 分區化後 Linkclump 等擴充功能大量開啟的連結不變色的問題
 // @match        *://1080xin.com/*
 // @match        *://*.1080xin.com/*
@@ -34,6 +34,20 @@
  比對鍵值不含主機名。安裝後會自動把舊的 agaghhh.cc 記錄轉成新格式，
  只跑一次。以後再換網域，只要在 @match 和 SITE_HOSTS 各加一行即可。
  上面 agaghhh.cc 的兩行 @match 若用不到可以刪掉，不影響已轉好的記錄。
+
+ 關於 /boards/ 不打勾（v1.3 新增）
+ ─────────────────────────────────────────────────────────────
+ 板塊列表頁（/boards/…）上的已開連結只淡化、變灰、整列加底色，不加 ✓。
+ 其他頁面照舊。要增減套用的頁面，改 CONFIG.NO_BADGE_PATHS 即可。
+ 網站是 Next.js，換頁不一定重新載入，所以每次重新掃描連結時都會重新判斷一次。
+
+ 陰影深淺（v1.4 新增）
+ ─────────────────────────────────────────────────────────────
+ 已開連結所在的整列會加一層灰色陰影（底色）。從 Tampermonkey 選單
+ 「調整陰影深淺」打開拉桿，拖動時頁面即時預覽，按「儲存」才會保存，
+ 所有分頁同步套用；調到 0% 就是不加陰影。預設值與顏色在
+ CONFIG.ROW_SHADE_ALPHA / ROW_SHADE_RGB。
+ 若某個頁面拉了沒反應，代表那頁的「一列」不是 tr / li，要改 CONFIG.ROW_SELECTOR。
 
  安裝
  ─────────────────────────────────────────────────────────────
@@ -73,9 +87,14 @@
         DIM_OPACITY: 0.45,          // 已開連結的透明度
         MARK_COLOR: '#9aa0a6',      // 已開連結的文字顏色，設成 null 表示不改顏色
         BADGE: ' ✓',                // 接在連結後面的小記號，設成 '' 表示不加
-        DIM_ROW: true,              // 是否讓整列也淡一點
+        NO_BADGE_PATHS: [           // 路徑符合的頁面不加 BADGE（淡化、變灰照舊）
+            /^\/boards(\/|$)/i,     // 板塊列表頁
+        ],
+        DIM_ROW: true,              // 是否讓整列加一層陰影
         ROW_SELECTOR: 'tr, li',     // 「一列」怎麼認定
-        ROW_BG: 'rgba(128,128,128,.10)',
+        ROW_SHADE_RGB: '128,128,128', // 陰影顏色（R,G,B）
+        ROW_SHADE_ALPHA: 0.10,      // 陰影預設深淺（0~1），可從選單「調整陰影深淺」改
+        ROW_SHADE_MAX: 0.40,        // 拉桿上限
 
         // 網址正規化：決定兩個網址算不算同一筆
         MERGE_THREAD_PAGES: true,   // 同一主題的第 2、3 頁視為同一筆
@@ -101,10 +120,17 @@
     const STORE_KEY = 'seen_v1';
     const ENABLED_KEY = 'enabled_v1';
     const MIGRATED_KEY = 'host_migrated_v1';
+    const SHADE_KEY = 'row_shade_v1';
 
     // ===== 儲存 ============================================================
     let store = read();
     let enabled = GM_getValue(ENABLED_KEY, true);
+    let shade = readShade();
+
+    function readShade() {
+        const v = GM_getValue(SHADE_KEY, null);
+        return (typeof v === 'number' && v >= 0 && v <= 1) ? v : CONFIG.ROW_SHADE_ALPHA;
+    }
 
     function read() {
         try { return GM_getValue(STORE_KEY, {}) || {}; } catch (e) { return {}; }
@@ -174,6 +200,12 @@
             store = newVal || {};
             scan();
         });
+        // 陰影深淺在其他分頁改過，這裡跟著換
+        GM_addValueChangeListener(SHADE_KEY, (name, oldVal, newVal, remote) => {
+            if (!remote) return;
+            shade = readShade();
+            refreshDynamicCSS();
+        });
     }
 
     // ===== 網址正規化 ======================================================
@@ -224,17 +256,12 @@
 
     // ===== 樣式 ============================================================
     function injectCSS() {
+        // 勾號與整列陰影會隨頁面、設定變動，放在 refreshDynamicCSS() 另外管理
         const color = CONFIG.MARK_COLOR
             ? `a[data-seen="1"], a[data-seen="1"] * { color: ${CONFIG.MARK_COLOR} !important; }` : '';
-        const badge = CONFIG.BADGE
-            ? `a[data-seen="1"]::after { content: "${CONFIG.BADGE}"; font-size: .85em; opacity: .8; }` : '';
-        const row = CONFIG.DIM_ROW
-            ? `[data-seen-row="1"] { background-color: ${CONFIG.ROW_BG} !important; }` : '';
         const css = `
             a[data-seen="1"] { opacity: ${CONFIG.DIM_OPACITY} !important; }
             ${color}
-            ${badge}
-            ${row}
             #vm-toast {
                 position: fixed; right: 16px; bottom: 16px; z-index: 2147483647;
                 background: #202124; color: #fff; font: 13px/1.5 system-ui, sans-serif;
@@ -257,10 +284,36 @@
                 font: 12px/1.4 ui-monospace, monospace; padding: 8px;
             }
             #vm-panel button { margin-left: 8px; padding: 5px 12px; cursor: pointer; }
+            #vm-panel .vm-slider { display: flex; align-items: center; gap: 12px; margin: 14px 0 10px; }
+            #vm-panel .vm-slider input { flex: 1; }
+            #vm-panel .vm-slider span { min-width: 7em; text-align: right; font-variant-numeric: tabular-nums; }
+            #vm-panel .vm-preview { padding: 8px 10px; margin-bottom: 12px; border: 1px solid #dadce0; border-radius: 4px; }
         `;
         const el = document.createElement('style');
         el.textContent = css;
         (document.head || document.documentElement).appendChild(el);
+    }
+
+    // 勾號（依目前路徑）與整列陰影（依設定）。只改腳本自己的 <style>，不動頁面的 <html>，
+    // 避免被 Next.js 重新渲染時洗掉。換頁不一定重新載入，所以每次掃描都重算一次。
+    let dynEl = null, dynCss = null;
+    function refreshDynamicCSS() {
+        const parts = [];
+        if (CONFIG.BADGE && !CONFIG.NO_BADGE_PATHS.some(re => re.test(location.pathname))) {
+            parts.push(`a[data-seen="1"]::after { content: ${JSON.stringify(CONFIG.BADGE)}; font-size: .85em; opacity: .8; }`);
+        }
+        if (CONFIG.DIM_ROW && shade > 0) {
+            parts.push(`[data-seen-row="1"] { background-color: rgba(${CONFIG.ROW_SHADE_RGB}, ${shade}) !important; }`);
+        }
+        const css = parts.join('\n');
+        if (dynEl && dynEl.isConnected && css === dynCss) return;
+        if (!dynEl || !dynEl.isConnected) {
+            dynEl = document.createElement('style');
+            dynEl.id = 'vm-dyn';
+            (document.head || document.documentElement).appendChild(dynEl);
+        }
+        dynEl.textContent = css;
+        dynCss = css;
     }
 
     // ===== 標記 ============================================================
@@ -283,6 +336,7 @@
     function scan() {
         clearTimeout(scanTimer);
         scanTimer = setTimeout(() => {
+            refreshDynamicCSS();
             document.querySelectorAll('a[href]').forEach(apply);
         }, 60);
     }
@@ -293,6 +347,8 @@
                 if (m.addedNodes.length) { scan(); return; }
             }
         }).observe(document.body, { childList: true, subtree: true });
+        // 上一頁 / 下一頁
+        window.addEventListener('popstate', scan);
     }
 
     // ===== 選取範圍 ========================================================
@@ -367,6 +423,67 @@
         ta.select();
     }
 
+    // 陰影深淺：拖動即時預覽，按「儲存」才寫入；取消、Esc、點外面都會還原
+    function shadePanel() {
+        if (!document.body || document.getElementById('vm-panel')) return;
+        if (!CONFIG.DIM_ROW) return toast('整列陰影已在設定中關閉（CONFIG.DIM_ROW）');
+
+        const original = shade;
+        const max = Math.round(CONFIG.ROW_SHADE_MAX * 100);
+        const wrap = document.createElement('div');
+        wrap.id = 'vm-panel';
+        wrap.innerHTML = `
+            <div>
+                <b>已開連結整列陰影深淺</b>
+                <div class="vm-slider">
+                    <input type="range" min="0" max="${max}" step="1">
+                    <span></span>
+                </div>
+                <div class="vm-preview" data-seen-row="1">預覽：已開連結所在的那一列會是這個底色</div>
+                <div style="text-align:right">
+                    <button data-act="reset">恢復預設</button>
+                    <button data-act="cancel">取消</button>
+                    <button data-act="save">儲存</button>
+                </div>
+            </div>`;
+        const range = wrap.querySelector('input');
+        const label = wrap.querySelector('.vm-slider span');
+
+        function show(pct) {
+            range.value = pct;
+            label.textContent = pct === 0 ? '0%（不加陰影）' : pct + '%';
+            shade = pct / 100;
+            refreshDynamicCSS();
+        }
+        function close(save) {
+            if (save) {
+                GM_setValue(SHADE_KEY, shade);
+                toast(`陰影深淺已設為 ${Math.round(shade * 100)}%`);
+            } else {
+                shade = original;
+                refreshDynamicCSS();
+            }
+            document.removeEventListener('keydown', onKey, true);
+            wrap.remove();
+        }
+        function onKey(e) {
+            if (e.key === 'Escape') { e.preventDefault(); close(false); }
+        }
+
+        range.addEventListener('input', () => show(Number(range.value)));
+        wrap.addEventListener('click', e => {
+            const act = e.target.dataset && e.target.dataset.act;
+            if (act === 'save') close(true);
+            else if (act === 'cancel' || e.target === wrap) close(false);
+            else if (act === 'reset') show(Math.round(CONFIG.ROW_SHADE_ALPHA * 100));
+        });
+        document.addEventListener('keydown', onKey, true);
+
+        document.body.appendChild(wrap);
+        show(Math.min(max, Math.round(shade * 100)));
+        range.focus();
+    }
+
     // ===== 事件 ============================================================
     function bind() {
         // Alt + 點擊：單獨切換標記，不開啟頁面
@@ -431,6 +548,8 @@
             location.reload();
         });
 
+        GM_registerMenuCommand('調整陰影深淺', shadePanel);
+
         GM_registerMenuCommand('把本頁所有連結標記為已開', () => {
             const keys = [...document.querySelectorAll('a[href]')]
                 .map(a => keyOf(a.href)).filter(Boolean);
@@ -484,6 +603,7 @@
 
     // ===== 啟動 ============================================================
     injectCSS();
+    refreshDynamicCSS();
     migrateHosts();
 
     if (CONFIG.RECORD_ON_LOAD && !ignored(location.href)) {
