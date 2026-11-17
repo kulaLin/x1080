@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [x1080] 版面｜附件區塊右側懸浮
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.8
-// @description  將 attachments-section 改為右側懸浮、垂直排列、下載按鈕移至最底部、隱藏各身份價格階梯；拖曳上方把手可移動位置（X/Y 軸），可選 iOS 27 液態玻璃（Liquid Glass）或經典透明風格，設定面板可調位置、寬度、透明度與深淺，100%保留原生按鈕
+// @version      4.9
+// @description  將 attachments-section 改為右側懸浮、垂直排列、下載按鈕移至最底部、隱藏各身份價格階梯；拖曳上方把手可移動位置（X/Y 軸），可選 iOS 27 液態玻璃（Liquid Glass）或經典透明風格，設定面板可調位置、寬度、透明度、深淺與液態玻璃陰影，100%保留原生按鈕
 // @match        *://*.1080xin.com/*
 // @match        *://1080xin.com/*
 // @run-at       document-start
@@ -29,9 +29,13 @@
         panelStyle: 'glass',  // 風格：'glass' = iOS 27 液態玻璃（Liquid Glass），'classic' = 經典透明毛玻璃（v4.7 以前的樣子）
         glassOpacity: 0.3,    // 【液態玻璃】玻璃不透明度，類似 iOS 27 的透明度滑桿（0 = 最透明，1 = 完全不透明）
         glassTheme: 'auto',   // 【液態玻璃】深淺：'auto' 跟著系統淺色 / 深色模式，'light' 永遠淺色，'dark' 永遠深色
+        shadowOpacity: 0.18,  // 【液態玻璃】外圍陰影深淺（0 = 沒有陰影，1 = 最深）
+        shadowSize: 30,       // 【液態玻璃】外圍陰影大小：陰影往外擴散的範圍（px；越大越柔和、看起來越浮起來）
         bgOpacity: 0,         // 【經典】背景不透明度：0 = 完全透明，0.2 = 微透黑底
-        blurPx: 8,            // 【經典】毛玻璃模糊程度（px）：0 = 不模糊，8 = 微毛玻璃（防背景文字干擾閱讀）
     };
+    // 【經典】固定的毛玻璃模糊（v4.6 原本的值）。v4.9 起不再提供滑桿：區塊通常在畫面右側空白處，
+    // 背景是純色時模糊看不出差別；只有文字捲到區塊後面時才有作用，固定 8px 就夠
+    const CLASSIC_BLUR = 'blur(8px)';
     const SETTINGS_KEY = 'settings';
     const STYLES = ['glass', 'classic'];
     const THEMES = ['auto', 'light', 'dark'];
@@ -121,11 +125,23 @@
         const rim = dark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.9)';
         const edge = dark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.45)';
         const mini = dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.35)';
+        // 液態玻璃外圍陰影：一層大範圍的柔和陰影 + 一層貼近邊緣的細陰影（預設 = 0 10px 30px 18% 黑 + 0 2px 8px 10% 黑）
+        const shadowA = clamp(Number(settings.shadowOpacity) || 0, 0, 1);
+        const shadowPx = Math.max(0, Number(settings.shadowSize) || 0);
+        const hasShadow = shadowA > 0 && shadowPx > 0;
+        const outerShadow = hasShadow
+            ? `, 0 ${Math.round(shadowPx / 3)}px ${shadowPx}px rgba(0, 0, 0, ${shadowA.toFixed(3)}), 0 ${Math.max(1, Math.round(shadowPx / 15))}px ${Math.max(1, Math.round(shadowPx * 0.27))}px rgba(0, 0, 0, ${(shadowA * 0.55).toFixed(3)})`
+            : '';
+        // 把手在區塊上方，只往上投一點淡淡的陰影（預設 = 0 -2px 10px 6% 黑）
+        const handleOuter = hasShadow
+            ? `, 0 -${Math.max(1, Math.round(shadowPx / 15))}px ${Math.max(1, Math.round(shadowPx / 3))}px rgba(0, 0, 0, ${(shadowA / 3).toFixed(3)})`
+            : '';
         const common = {
             text: dark ? '#f5f5f7' : '#1d1d1f',
             rim,
             edge,
             btnBg: `linear-gradient(160deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 55%, rgba(255,255,255,0.12) 100%), ${mini}`,
+            btnShadow: `inset 0 1px 1px ${rim}` + (shadowA > 0 ? `, 0 1px 3px rgba(0, 0, 0, ${(shadowA * 0.55).toFixed(3)})` : ''),
         };
 
         if (settings.panelStyle === 'glass') {
@@ -136,14 +152,14 @@
                 filter: solid ? 'none' : 'blur(12px) saturate(190%) brightness(1.05)',
                 border: `1px solid ${edge}`,
                 radius: '18px',
-                handleShadow: `inset 0 1px 1px ${rim}, 0 -2px 10px rgba(0, 0, 0, 0.06)`,
-                shadow: 'inset 0 -1px 1px rgba(255, 255, 255, 0.2), inset 0 0 18px rgba(255, 255, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1)',
+                handleShadow: `inset 0 1px 1px ${rim}${handleOuter}`,
+                shadow: `inset 0 -1px 1px rgba(255, 255, 255, 0.2), inset 0 0 18px rgba(255, 255, 255, 0.12)${outerShadow}`,
             });
         }
         return Object.assign(common, {
             handleBg: 'rgba(128, 128, 128, 0.16)',
             bg: `rgba(0, 0, 0, ${clamp(Number(settings.bgOpacity) || 0, 0, 1)})`,
-            filter: `blur(${clamp(Number(settings.blurPx) || 0, 0, 40)}px)`,
+            filter: CLASSIC_BLUR,
             border: '1px solid rgba(128, 128, 128, 0.3)',
             radius: '10px',
             handleShadow: 'none',
@@ -247,7 +263,7 @@
             font-weight: 600 !important;
             line-height: 1.4 !important;
             text-decoration: none !important;
-            box-shadow: inset 0 1px 1px var(--tm-ap-rim), 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+            box-shadow: var(--tm-ap-btn-shadow, inset 0 1px 1px var(--tm-ap-rim)) !important;
             cursor: pointer !important;
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease !important;
         }
@@ -405,31 +421,41 @@
         #tm-ap-settings .tm-row.tm-stack { flex-direction: column; align-items: stretch; gap: 4px; }
         #tm-ap-settings .tm-row-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         #tm-ap-settings .tm-val { display: inline-flex; align-items: center; gap: 4px; color: var(--tm-sub); white-space: nowrap; }
+        /* 網站本身的 input 樣式（高度、邊框、陰影）會把滑桿與數字框撐大，尺寸相關的屬性用 !important 固定 */
         #tm-ap-settings .tm-num {
             -webkit-appearance: none;
             appearance: none;
             -moz-appearance: textfield;
             box-sizing: border-box;
-            width: 68px;
-            margin: 0;
-            padding: 3px 8px;
-            border-radius: 8px;
-            border: 1px solid var(--tm-edge);
-            background: var(--tm-mini);
+            width: 68px !important;
+            margin: 0 !important;
+            padding: 3px 8px !important;
+            border-radius: 8px !important;
+            border: 1px solid var(--tm-edge) !important;
+            background: var(--tm-mini) !important;
             color: var(--tm-text);
             font: inherit;
             text-align: right;
+            height: 28px !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            box-shadow: none !important;
+            line-height: 20px !important;
+            font-size: 13px !important;
         }
         #tm-ap-settings .tm-num:focus { outline: 2px solid rgba(10, 132, 255, 0.6); outline-offset: 1px; }
         #tm-ap-settings .tm-range {
             -webkit-appearance: none;
             appearance: none;
             width: 100%;
-            height: 4px;
-            margin: 10px 0 6px;
-            padding: 0;
-            border: 0;
-            border-radius: 999px;
+            height: 4px !important;
+            margin: 10px 0 6px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 999px !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            box-shadow: none !important;
             background: linear-gradient(to right, ${ACCENT} var(--p, 0%), var(--tm-track) var(--p, 0%));
             outline: none;
             cursor: pointer;
@@ -459,14 +485,18 @@
             appearance: none;
             position: relative;
             flex: none;
-            width: 46px;
-            height: 28px;
-            margin: 0;
-            border: 0;
-            border-radius: 999px;
+            width: 46px !important;
+            height: 28px !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: 999px !important;
             background: var(--tm-track);
             cursor: pointer;
             transition: background 0.25s ease;
+            min-height: 0 !important;
+            max-height: none !important;
+            padding: 0 !important;
+            box-shadow: none !important;
         }
         #tm-ap-settings .tm-switch::after {
             content: "";
@@ -546,6 +576,7 @@
             ['--tm-ap-rim', look.rim],
             ['--tm-ap-edge', look.edge],
             ['--tm-ap-btn-bg', look.btnBg],
+            ['--tm-ap-btn-shadow', look.btnShadow],
         ];
         const key = vars.map(v => v[1]).join('|');
         if (key === lastVars && rule.style.getPropertyValue('--tm-ap-top')) return;
@@ -726,8 +757,9 @@
         { key: 'panelStyle', label: '風格', type: 'seg', options: [['glass', '液態玻璃'], ['classic', '經典']] },
         { key: 'glassOpacity', label: '玻璃不透明度', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100, when: isGlass },
         { key: 'glassTheme', label: '玻璃深淺', type: 'seg', options: [['auto', '自動'], ['light', '淺色'], ['dark', '深色']], when: isGlass },
+        { key: 'shadowOpacity', label: '外圍陰影深淺（0% = 沒有陰影）', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100, when: isGlass },
+        { key: 'shadowSize', label: '外圍陰影大小', type: 'range', unit: 'px', min: 0, step: 1, max: () => 80, when: isGlass },
         { key: 'bgOpacity', label: '背景不透明度', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100, when: isClassic },
-        { key: 'blurPx', label: '毛玻璃模糊', type: 'range', unit: 'px', min: 0, step: 1, max: () => 20, when: isClassic },
     ];
 
     function setSetting(key, value) {
