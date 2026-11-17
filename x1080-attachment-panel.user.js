@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 版面｜附件區塊右側懸浮
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.9
+// @version      4.10
 // @description  將 attachments-section 改為右側懸浮、垂直排列、下載按鈕移至最底部、隱藏各身份價格階梯；拖曳上方把手可移動位置（X/Y 軸），可選 iOS 27 液態玻璃（Liquid Glass）或經典透明風格，設定面板可調位置、寬度、透明度、深淺與液態玻璃陰影，100%保留原生按鈕
 // @match        *://*.1080xin.com/*
 // @match        *://1080xin.com/*
@@ -32,12 +32,14 @@
         shadowOpacity: 0.18,  // 【液態玻璃】外圍陰影深淺（0 = 沒有陰影，1 = 最深）
         shadowSize: 30,       // 【液態玻璃】外圍陰影大小：陰影往外擴散的範圍（px；越大越柔和、看起來越浮起來）
         bgOpacity: 0,         // 【經典】背景不透明度：0 = 完全透明，0.2 = 微透黑底
+        classicCorner: 'classic', // 【經典】圓角：'classic' = 經典 10px，'glass' = 跟液態玻璃一樣的 18px 大圓角（下載按鈕也改成膠囊形）
     };
     // 【經典】固定的毛玻璃模糊（v4.6 原本的值）。v4.9 起不再提供滑桿：區塊通常在畫面右側空白處，
     // 背景是純色時模糊看不出差別；只有文字捲到區塊後面時才有作用，固定 8px 就夠
     const CLASSIC_BLUR = 'blur(8px)';
     const SETTINGS_KEY = 'settings';
     const STYLES = ['glass', 'classic'];
+    const CORNERS = ['classic', 'glass'];
     const THEMES = ['auto', 'light', 'dark'];
     const HANDLE_H = 26;                       // 拖曳把手高度（px）
     const WIDTH_MIN = 200, WIDTH_MAX = 600;    // 寬度可調範圍（px）
@@ -60,6 +62,7 @@
             if (ok) result[key] = v;
         }
         if (!STYLES.includes(result.panelStyle)) result.panelStyle = DEFAULTS.panelStyle;
+        if (!CORNERS.includes(result.classicCorner)) result.classicCorner = DEFAULTS.classicCorner;
         if (!THEMES.includes(result.glassTheme)) result.glassTheme = DEFAULTS.glassTheme;
         return result;
     }
@@ -161,7 +164,7 @@
             bg: `rgba(0, 0, 0, ${clamp(Number(settings.bgOpacity) || 0, 0, 1)})`,
             filter: CLASSIC_BLUR,
             border: '1px solid rgba(128, 128, 128, 0.3)',
-            radius: '10px',
+            radius: settings.classicCorner === 'glass' ? '18px' : '10px',   // 液態玻璃圓角 = 和液態玻璃風格相同的 18px
             handleShadow: 'none',
             shadow: 'none',
         });
@@ -270,6 +273,8 @@
         section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl] * { color: inherit !important; }
         section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl]:hover { transform: scale(1.03); filter: brightness(1.06); }
         section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl]:active { transform: scale(1.06); filter: brightness(1.12); transition-duration: 0.2s !important; }
+        /* 經典 + 液態玻璃圓角：保留網站原本的下載按鈕樣式，只把形狀改成和液態玻璃一樣的膠囊 */
+        section.attachments-section[data-tm-ap-style="classic"][data-tm-ap-round="1"] [data-tm-ap-dl] { border-radius: 999px !important; }
         @media (prefers-reduced-motion: reduce) {
             section.attachments-section[data-tm-ap-style="glass"] [data-tm-ap-dl] { transition: none !important; transform: none !important; }
         }
@@ -588,8 +593,10 @@
     function applyMode() {
         const style = settings.panelStyle;
         const glass = style === 'glass';
+        const round = !glass && settings.classicCorner === 'glass' ? '1' : '0';   // 經典風格是否用液態玻璃圓角
         document.querySelectorAll('section.attachments-section').forEach(sec => {
             if (sec.dataset.tmApStyle !== style) sec.dataset.tmApStyle = style;
+            if (sec.dataset.tmApRound !== round) sec.dataset.tmApRound = round;
         });
         if (handle) handle.classList.toggle('is-glass', glass);
         document.getElementById('tm-ap-preview')?.classList.toggle('is-glass', glass);
@@ -759,6 +766,7 @@
         { key: 'glassTheme', label: '玻璃深淺', type: 'seg', options: [['auto', '自動'], ['light', '淺色'], ['dark', '深色']], when: isGlass },
         { key: 'shadowOpacity', label: '外圍陰影深淺（0% = 沒有陰影）', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100, when: isGlass },
         { key: 'shadowSize', label: '外圍陰影大小', type: 'range', unit: 'px', min: 0, step: 1, max: () => 80, when: isGlass },
+        { key: 'classicCorner', label: '圓角', type: 'seg', options: [['classic', '經典'], ['glass', '液態玻璃']], when: isClassic },
         { key: 'bgOpacity', label: '背景不透明度', type: 'range', unit: '%', min: 0, step: 1, max: () => 100, scale: 100, when: isClassic },
     ];
 

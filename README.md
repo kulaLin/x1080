@@ -212,7 +212,7 @@ Pins the post's attachment section (`section.attachments-section`) to the right 
 - The handle's ↺ restores the default position and ⚙️ opens the settings panel; the position can be locked in settings to avoid accidental drags
 - Two switchable styles:
   - **Liquid Glass** (default): the same iOS 27 Liquid Glass look as x1080-attachment-extract — translucent blur, boosted saturation and edge highlights; the handle and panel join into one sheet of glass, and the download button becomes a clear glass pill that swells slightly when pressed. The glass tone follows the system light/dark mode or can be fixed to light or dark; the outer shadow's depth and size are adjustable; it turns opaque when the system's Reduce Transparency setting is on
-  - **Classic**: the transparent background with frosted glass used up to v4.7 (fixed 8px blur)
+  - **Classic**: the transparent background with frosted glass used up to v4.7 (fixed 8px blur); corners can be classic 10px or the same 18px rounded corners as Liquid Glass (the download button also becomes a pill while keeping the site's own button style)
 - All inner containers become a single vertical column; file names show in full instead of being squeezed into a narrow strip
 - The 「按次數下載／下載」 (download) button moves to the bottom of the panel and fills the full width
 - Hides the 「各身份價格」 (price per member level) button and the price-tier list (`.price-tiers` — points / free / not eligible per member level), the 「下載說明」 (download help) link and the RAR icon
@@ -233,6 +233,7 @@ Open the settings panel with the **⚙️** on the handle, by **right-clicking**
 | Glass tone (Liquid Glass) | Auto | Auto (follows the system light/dark mode) / Light / Dark; set it to match the site if the site and system differ |
 | Outer shadow depth (Liquid Glass) | `18%` | How dark the shadow around the glass panel is; `0%` = no shadow; shadows are naturally subtle on dark pages |
 | Outer shadow size (Liquid Glass) | `30` px | How far the shadow spreads; larger looks softer and more raised |
+| Corners (Classic) | Classic | Classic (10px) / Liquid Glass (18px rounded corners; the download button becomes a pill) |
 | Background opacity (Classic) | `0%` | `0%` = fully transparent, `20%` = light dark tint |
 
 > The defaults live in `DEFAULTS` at the top of the script. From v4.7 the script needs the `GM_getValue` / `GM_setValue` / `GM_registerMenuCommand` grants to remember settings; constants such as `TOP_OFFSET` edited in older versions are not carried over, so set them again in the settings panel. From v4.8 the default style is Liquid Glass; switch 「風格」 (Style) to 「經典」 (Classic) in settings for the previous look. From v4.9 the Classic frosted-glass blur is fixed at 8px with no slider (the panel usually sits over the blank right margin, where blurring a plain background makes no visible difference).
