@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜附件連結一鍵提取
 // @namespace    https://github.com/kulaLin/x1080
-// @version      2.15
+// @version      2.16
 // @description  自動點擊「按次數下載」並攔截真實下載網址與 Token，完成後自動關閉分頁
 // @author       Gemini
 // @match        *://1080xin.com/*
@@ -265,31 +265,41 @@
         #tm-settings-panel .tm-row.tm-stack { flex-direction: column; align-items: stretch; gap: 4px; }
         #tm-settings-panel .tm-row-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         #tm-settings-panel .tm-val { display: inline-flex; align-items: center; gap: 4px; color: var(--tm-sub); white-space: nowrap; }
+        /* 網站本身的 input 樣式（高度、邊框、陰影）會把滑桿與數字框撐大，尺寸相關的屬性用 !important 固定 */
         #tm-settings-panel .tm-num {
             -webkit-appearance: none;
             appearance: none;
             -moz-appearance: textfield;
             box-sizing: border-box;
-            width: 68px;
-            margin: 0;
-            padding: 3px 8px;
-            border-radius: 8px;
-            border: 1px solid var(--tm-edge);
-            background: var(--tm-mini);
+            width: 68px !important;
+            margin: 0 !important;
+            padding: 3px 8px !important;
+            border-radius: 8px !important;
+            border: 1px solid var(--tm-edge) !important;
+            background: var(--tm-mini) !important;
             color: var(--tm-text);
             font: inherit;
             text-align: right;
+            height: 28px !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            box-shadow: none !important;
+            line-height: 20px !important;
+            font-size: 13px !important;
         }
         #tm-settings-panel .tm-num:focus { outline: 2px solid rgba(10, 132, 255, 0.6); outline-offset: 1px; }
         #tm-settings-panel .tm-range {
             -webkit-appearance: none;
             appearance: none;
             width: 100%;
-            height: 4px;
-            margin: 10px 0 6px;
-            padding: 0;
-            border: 0;
-            border-radius: 999px;
+            height: 4px !important;
+            margin: 10px 0 6px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 999px !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            box-shadow: none !important;
             background: linear-gradient(to right, ${ACCENT} var(--p, 0%), var(--tm-track) var(--p, 0%));
             outline: none;
             cursor: pointer;
@@ -319,14 +329,18 @@
             appearance: none;
             position: relative;
             flex: none;
-            width: 46px;
-            height: 28px;
-            margin: 0;
-            border: 0;
-            border-radius: 999px;
+            width: 46px !important;
+            height: 28px !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: 999px !important;
             background: var(--tm-track);
             cursor: pointer;
             transition: background 0.25s ease;
+            min-height: 0 !important;
+            max-height: none !important;
+            padding: 0 !important;
+            box-shadow: none !important;
         }
         #tm-settings-panel .tm-switch::after {
             content: "";
