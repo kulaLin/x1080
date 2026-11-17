@@ -159,7 +159,7 @@ When the page has 「按次數下載」 (download by count) buttons, a 「⚡ �
 | `AUTO_CLOSE_TAB` | `true` | Close the tab when done |
 | `CLOSE_DELAY_MS` | `100` | Milliseconds to wait before closing after everything is done |
 | `WAIT_TIMEOUT_MS` | `20000` | Maximum milliseconds to wait for all attachments; on timeout the tab is not closed |
-| `BUTTON_TOP` | `'35vh'` | Distance of the extract button from the top of the screen (`35vh` = 35% of the screen height; smaller = higher); the intercept panel follows below it |
+| `BUTTON_TOP` | `'calc(35vh - 10px)'` | Distance of the extract button from the top of the screen (`35vh` = 35% of the screen height, `- 10px` = 10 pixels higher; smaller = higher); the intercept panel follows below it |
 
 > Note: change settings in this repo. Edits made in the Tampermonkey editor are overwritten by the next auto-update.
 

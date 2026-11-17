@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [x1080] 下載｜附件連結一鍵提取
 // @namespace    https://github.com/kulaLin/x1080
-// @version      2.10
+// @version      2.11
 // @description  自動點擊「按次數下載」並攔截真實下載網址與 Token，完成後自動關閉分頁
 // @author       Gemini
 // @match        *://1080xin.com/*
@@ -27,8 +27,8 @@
     const CLOSE_DELAY_MS = 100;
     // 設定：最多等幾毫秒讓所有附件完成；超時代表有附件沒成功，就不自動關閉
     const WAIT_TIMEOUT_MS = 20000;
-    // 設定：一鍵提取按鈕距離畫面頂端多遠（35vh = 畫面高度的 35%，數字越小越上面；攔截面板會自動跟在按鈕下方）
-    const BUTTON_TOP = '35vh';
+    // 設定：一鍵提取按鈕距離畫面頂端多遠（35vh = 畫面高度的 35%，- 10px = 再往上 10 像素；數字越小越上面；攔截面板會自動跟在按鈕下方）
+    const BUTTON_TOP = 'calc(35vh - 10px)';
     // 攔截面板 / 收合小按鈕的位置 = 一鍵提取按鈕下方 60px（固定換算，不用改）
     const PANEL_TOP = `calc(${BUTTON_TOP} + 60px)`;
 
