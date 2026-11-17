@@ -201,7 +201,7 @@ Pins the post's attachment section (`section.attachments-section`) to the right 
 - The attachment section floats on the right (280px wide) and scrolls inside itself when too long
 - All inner containers become a single vertical column; file names show in full instead of being squeezed into a narrow strip
 - The 「按次數下載／下載」 (download) button moves to the bottom of the panel and fills the full width
-- Hides the 「各身份價格」 (price per member level) button, the 「下載說明」 (download help) link and the RAR icon
+- Hides the 「各身份價格」 (price per member level) button and the price-tier list (`.price-tiers` — points / free / not eligible per member level), the 「下載說明」 (download help) link and the RAR icon
 - Re-applies automatically when the site loads content dynamically or changes pages
 
 ### Settings (constants at the top of the script)

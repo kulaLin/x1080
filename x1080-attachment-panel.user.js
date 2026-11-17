@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [x1080] 版面｜附件區塊右側懸浮
 // @namespace    https://github.com/kulaLin/x1080
-// @version      4.5
-// @description  將 attachments-section 改為右側垂直排列、透明背景、下載按鈕徹底移至最底部、檔名完整橫排顯示，100%保留原生按鈕
+// @version      4.6
+// @description  將 attachments-section 改為右側垂直排列、透明背景、下載按鈕徹底移至最底部、檔名完整橫排顯示、隱藏各身份價格階梯，100%保留原生按鈕
 // @match        *://*.1080xin.com/*
 // @match        *://1080xin.com/*
 // @run-at       document-start
@@ -88,9 +88,11 @@
             word-break: break-all !important;
         }
 
-        /* 4. 隱藏「各身份價格」、「下載說明」、「RAR 圖示」 */
+        /* 4. 隱藏「各身份價格」（按鈕與價格階梯 .price-tiers）、「下載說明」、「RAR 圖示」 */
         section.attachments-section button.file-more,
         button.file-more,
+        section.attachments-section .price-tiers,
+        div.price-tiers,
         section.attachments-section a[href="/help"],
         section.attachments-section a[href*="/help"],
         a[href="/help"][data-seen],
